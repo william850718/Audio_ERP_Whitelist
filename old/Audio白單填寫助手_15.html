@@ -210,7 +210,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   <div class="inner">
     <button class="btn add" id="addRec">＋ 新增一筆（最多 3 筆）</button>
     <span class="sub" id="recCount" style="color:var(--muted);font-size:12.5px"></span>
-    <button class="btn primary" id="exportBtn">匯出白單（每筆一檔）</button>
+    <button class="btn primary" id="exportBtn">匯出整張白單（全部記錄）</button>
   </div>
 </div>
 
@@ -378,7 +378,6 @@ function liveRefresh(rec, i){
   if(hrInput){ hrInput.value = t.hrEdited? t.hr : c.hr; hrInput.classList.toggle('lunch', !t.hrEdited && c.lunch); }
   updateTotal(rec);
   updateLinePreview(rec);
-  scheduleSave();
 }
 function pickPart(trigger, pop, rid, i, k, part, val){
   const r=getRec(rid);
@@ -575,7 +574,7 @@ function fullCodeHtml(rec){
     return v? v : `<span class="miss">${'·'.repeat(s.w)}</span>`;
   }).join('');
 }
-function esc(v){ return String(v??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function esc(v){ return String(v??'').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 
 function render(){
   const root=document.getElementById('records');
@@ -583,7 +582,6 @@ function render(){
   document.getElementById('addRec').disabled = records.length>=3;
   document.getElementById('recCount').textContent = `目前 ${records.length} / 3 筆`;
   bind();
-  scheduleSave();
 }
 
 /* ---------- events ---------- */
@@ -617,7 +615,7 @@ function bind(){
   });
   document.querySelectorAll('[data-copy]').forEach(el=>{
     el.onclick=()=>{ const r=getRec(el.dataset.rid);
-      const txt = el.dataset.copy==='code' ? fullCode(r) : (r.erpEdited?r.erp:genErp(r));
+      const txt = el.dataset.copy==='code' ? (isComplete(r)?fullCode(r):fullCode(r)) : (r.erpEdited?r.erp:genErp(r));
       navigator.clipboard.writeText(txt).then(()=>toast(el.dataset.copy==='code'?'已複製 20 碼':'已複製 ERP 描述'));
     };
   });
@@ -700,8 +698,8 @@ function writeBlock(ws,bs,rec){
     const n=parseFloat(hrStr); setCell(ws,'N'+(bs+2+i), isNaN(n)?hrStr:n);  // 空白列 -> 0
   });
 }
-async function buildAndDownload(recsToWrite, fnSuffix, silent){
-  if(typeof ExcelJS==='undefined'){ toast('匯出元件尚未載入，請確認網路連線後重試',true); return false; }
+async function buildAndDownload(recsToWrite, fnSuffix){
+  if(typeof ExcelJS==='undefined'){ toast('匯出元件尚未載入，請確認網路連線後重試',true); return; }
   try{
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(b64ToU8(TPL_B64).buffer);
@@ -724,72 +722,25 @@ async function buildAndDownload(recsToWrite, fnSuffix, silent){
     const url=URL.createObjectURL(blob); const a=document.createElement('a');
     a.href=url; a.download=fn; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(()=>URL.revokeObjectURL(url),1500);
-    if(!silent) toast('已匯出 '+fn);
-    return true;
-  }catch(err){ console.error(err); toast('匯出失敗：'+err.message,true); return false; }
+    toast('已匯出 '+fn);
+  }catch(err){ console.error(err); toast('匯出失敗：'+err.message,true); }
 }
 async function doExport(){
   const btn=document.getElementById('exportBtn'); const prev=btn.textContent;
   btn.disabled=true; btn.textContent='匯出中…';
-  // 每一筆各自存成一個白單檔（共用同一個預約編號），一次全部下載
-  let n=0;
-  for(let i=0;i<records.length && i<3;i++){
-    const suffix = records.length>1 ? `_第${i+1}筆` : '';
-    const ok = await buildAndDownload([records[i]], suffix, true);
-    if(ok) n++;
-    await new Promise(r=>setTimeout(r, 450)); // 間隔，避免瀏覽器擋多檔下載
-  }
+  await buildAndDownload(records, '');
   btn.disabled=false; btn.textContent=prev;
-  if(n) toast(n>1 ? `已匯出 ${n} 個白單檔` : '已匯出白單');
 }
 document.getElementById('exportBtn').onclick=doExport;
 
-/* ---------- 本機自動暫存（localStorage：只存在使用者自己的瀏覽器，不會上傳或互通）---------- */
-const LS_KEY='audioWhitelist:v1';
-function saveState(){
-  try{
-    const g=id=>(document.getElementById(id)||{}).value||'';
-    localStorage.setItem(LS_KEY, JSON.stringify({
-      v:1, uid,
-      header:{ date:g('h_date'), book:g('h_book'), cust:g('h_cust'), contact:g('h_contact') },
-      records
-    }));
-  }catch(e){ /* 無痕模式或空間已滿等情況：忽略，不影響使用 */ }
-}
-let saveT;
-function scheduleSave(){ clearTimeout(saveT); saveT=setTimeout(saveState,300); }
-function normalizeRecord(r){
-  const b=blankRecord();                       // 以最新結構為底，避免舊暫存缺欄位而出錯
-  if(!r||typeof r!=='object') return b;
-  if(r.id) b.id=r.id;
-  Object.assign(b.sel, r.sel||{});
-  b.erpEdited=!!r.erpEdited; b.erp=r.erp||'';
-  ['order','lab','eng','brand','proj','dut','serial'].forEach(k=>{ if(r[k]!=null) b[k]=r[k]; });
-  if(Array.isArray(r.times)) b.times=b.times.map((t,i)=>{ const s=r.times[i]; return s?{start:s.start||'',end:s.end||'',hr:s.hr||'',hrEdited:!!s.hrEdited}:t; });
-  Object.assign(b.line, r.line||{});
-  return b;
-}
-function loadState(){
-  let data; try{ data=JSON.parse(localStorage.getItem(LS_KEY)||'null'); }catch(e){ data=null; }
-  if(!data || !Array.isArray(data.records) || !data.records.length) return false;
-  const h=data.header||{}, set=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=v||''; };
-  set('h_date',h.date); set('h_book',h.book); set('h_cust',h.cust); set('h_contact',h.contact);
-  sharedCustText=h.cust||''; sharedCust=extractCust(h.cust||''); sharedCustName=custNameFromText(h.cust||'');
-  records=data.records.slice(0,3).map(normalizeRecord);
-  uid=records.reduce((m,r)=>Math.max(m, r.id||0), 0);
-  return true;
-}
-
 /* init */
 document.addEventListener('click', closeAllPops);
-document.addEventListener('input', scheduleSave, true);   // 補捉表頭與各輸入框的即時輸入
-document.addEventListener('change', scheduleSave, true);
 ['h_date','h_book'].forEach(id=>{ const el=document.getElementById(id); if(el) el.oninput=render; });
 (function initCustomer(){
   const el=document.getElementById('h_cust');
   el.oninput=()=>{ sharedCustText=el.value; sharedCust=extractCust(el.value); sharedCustName=custNameFromText(el.value); render(); };
 })();
-if(!loadState()){ records.push(blankRecord()); }   // 有暫存就還原，否則開一張空白
+records.push(blankRecord());
 render();
 </script>
 </body>

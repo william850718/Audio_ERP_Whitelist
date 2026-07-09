@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audio 白單填寫助手</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<style>
+  :root{
+    --bg:#eef1f4; --paper:#ffffff; --ink:#1b1f27; --muted:#6b7280;
+    --line:#d8dde4; --line2:#e8ebef; --accent:#0b6e6b; --accent-d:#095956;
+    --amber:#b45309; --ok:#0b6e6b; --warn:#b91c1c; --chip:#f3f5f7;
+    --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Cascadia Mono",monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1120px;margin:0 auto;padding:18px 16px 80px}
+  /* header */
+  .topbar{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  .topbar h1{font-size:18px;margin:0;letter-spacing:.2px;font-weight:650}
+  .topbar .sub{color:var(--muted);font-size:12.5px}
+  .topbar .tag{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--muted);
+    background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:3px 10px}
+  .panel{background:var(--paper);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+  .shared{padding:12px 14px;margin-bottom:14px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px 14px}
+  @media(max-width:760px){.shared{grid-template-columns:repeat(2,1fr)}}
+  .fld{display:flex;flex-direction:column;gap:4px;min-width:0}
+  .fld>label{font-size:11.5px;color:var(--muted);font-weight:600;letter-spacing:.2px}
+  input,select,textarea{font-family:inherit;font-size:13.5px;color:var(--ink);background:#fff;
+    border:1px solid var(--line);border-radius:8px;padding:7px 9px;width:100%;outline:none;transition:border-color .12s,box-shadow .12s}
+  input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(11,110,107,.12)}
+  select{appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2 4l4 4 4-4' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat:no-repeat;background-position:right 8px center;padding-right:26px;cursor:pointer}
+  /* record card */
+  .rec{margin-bottom:16px;overflow:hidden}
+  .rec-head{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line2);background:#fafbfc}
+  .rec-no{font-family:var(--mono);font-size:12px;font-weight:700;color:#fff;background:var(--accent);
+    width:24px;height:24px;border-radius:7px;display:grid;place-items:center}
+  .rec-head .ttl{font-weight:650}
+  .rec-head .rm{margin-left:auto;border:1px solid var(--line);background:#fff;color:var(--muted);
+    border-radius:7px;padding:4px 10px;font-size:12px;cursor:pointer}
+  .rec-head .rm:hover{border-color:var(--warn);color:var(--warn)}
+  .rec-body{padding:14px}
+  .grid2{display:grid;grid-template-columns:1.15fr .85fr;gap:18px}
+  @media(max-width:880px){.grid2{grid-template-columns:1fr}}
+  .sect-t{font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:0 0 8px}
+  /* code builder selects */
+  .codegrid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px 12px}
+  @media(max-width:520px){.codegrid{grid-template-columns:1fr}}
+  .codegrid .pos{font-family:var(--mono);font-size:10px;color:var(--accent);font-weight:700}
+  .cust-ro{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--ink);background:#eef6f5;
+    border:1px dashed #9cc7c4;border-radius:8px;padding:7px 9px;min-height:36px;display:flex;align-items:center}
+  .cust-ro.muted{color:var(--muted);font-family:var(--sans);font-weight:500;font-size:12px}
+  /* readout */
+  .readout{margin-top:14px;border:1px solid var(--line);border-radius:10px;padding:12px;background:#fbfdfd}
+  .ro-segs{display:flex;flex-wrap:wrap;gap:4px}
+  .seg{display:flex;flex-direction:column;align-items:center;gap:3px}
+  .seg .ch{font-family:var(--mono);font-weight:700;font-size:18px;width:auto;min-width:20px;text-align:center;
+    padding:5px 3px;border-bottom:2px solid var(--accent);background:#fff;border-radius:3px 3px 0 0;line-height:1}
+  .seg.empty .ch{color:#b6bcc6;border-bottom-color:#cfd5dd;border-bottom-style:dashed}
+  .seg .pl{font-family:var(--mono);font-size:9px;color:var(--muted)}
+  .ro-full{margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .ro-full .code{font-family:var(--mono);font-size:16px;font-weight:700;letter-spacing:1px}
+  .ro-full .code .miss{color:#c2c8d0}
+  .copybtn{border:1px solid var(--line);background:#fff;border-radius:7px;padding:4px 9px;font-size:12px;cursor:pointer;color:var(--accent);font-weight:600}
+  .copybtn:hover{background:var(--chip)}
+  .erp-wrap{margin-top:12px}
+  .erp-wrap textarea{min-height:64px;resize:vertical;font-size:12.5px;line-height:1.5}
+  .erp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px}
+  .erp-head .sect-t{margin:0}
+  /* info fields right column */
+  .inforows{display:grid;grid-template-columns:1fr 1fr;gap:9px 12px}
+  .inforows .full{grid-column:1/-1}
+  /* times */
+  .times{margin-top:16px;border-top:1px dashed var(--line);padding-top:12px}
+  .timehdr{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .timehdr .sect-t{margin:0}
+  .timehdr .hint{font-size:11px;color:var(--muted)}
+  .trow{display:grid;grid-template-columns:120px 1fr 1fr 64px 18px;gap:8px;align-items:center;margin-bottom:6px}
+  @media(max-width:560px){.trow{grid-template-columns:96px 1fr 1fr 56px 16px}}
+  .trow .lbl{font-size:12.5px;color:var(--ink)}
+  .trow input[type=time]{padding:6px 8px}
+  .tp{position:relative}
+  .tp-trigger{display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%;
+    background:#fff;border:1px solid var(--line);border-radius:8px;padding:7px 9px;cursor:pointer;
+    font-family:var(--mono);font-size:13px;color:var(--ink);text-align:left}
+  .tp-trigger:hover{border-color:var(--accent)}
+  .tp-trigger.ph .tp-val{color:#b6bcc6}
+  .tp-clock{flex:0 0 auto;color:var(--muted)}
+  .tp-trigger:hover .tp-clock{color:var(--accent)}
+  .tp-pop{position:absolute;top:calc(100% + 4px);left:0;z-index:50;display:flex;gap:4px;
+    background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 28px rgba(16,24,40,.18);padding:4px}
+  .tp-col{overflow-y:auto;max-height:200px;scrollbar-width:thin}
+  .tp-ap,.tp-h{border-right:1px solid var(--line2);padding-right:3px}
+  .tp-opt{font-family:var(--mono);font-size:13px;padding:6px 8px;border-radius:6px;cursor:pointer;text-align:center;color:var(--ink);white-space:nowrap}
+  .tp-opt:hover{background:var(--chip)}
+  .tp-opt.sel{background:var(--accent);color:#fff;font-weight:700}
+  .trow .hr{font-family:var(--mono);text-align:right;font-weight:600}
+  .trow .hr.lunch{color:var(--amber)}
+  .trow .u{font-size:11px;color:var(--muted)}
+  .tsum{margin-top:8px;font-size:12px;color:var(--muted)}
+  .tsum b{color:var(--ink);font-family:var(--mono)}
+  /* footer actions */
+  .actions{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.92);backdrop-filter:blur(6px);
+    border-top:1px solid var(--line);padding:11px 16px;display:flex;gap:10px;align-items:center;z-index:20}
+  .actions .inner{max-width:1120px;margin:0 auto;width:100%;display:flex;gap:10px;align-items:center}
+  .btn{border:1px solid var(--line);background:#fff;border-radius:9px;padding:9px 14px;font-size:13.5px;font-weight:600;cursor:pointer;color:var(--ink)}
+  .btn:hover{background:var(--chip)}
+  .btn.add{color:var(--accent);border-color:var(--accent)}
+  .btn.add[disabled]{opacity:.4;cursor:not-allowed}
+  .btn.primary{margin-left:auto;background:var(--accent);color:#fff;border-color:var(--accent)}
+  .btn.primary:hover{background:var(--accent-d)}
+  .toast{position:fixed;left:50%;bottom:74px;transform:translateX(-50%) translateY(8px);opacity:0;
+    background:var(--ink);color:#fff;padding:9px 16px;border-radius:9px;font-size:13px;pointer-events:none;
+    transition:opacity .18s,transform .18s;z-index:40;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast.err{background:var(--warn)}
+  .hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <h1>Audio 白單填寫助手</h1>
+    <span class="sub">產品編號自動拼碼 · ERP 描述自動生成 · 工時自動計算 · 一鍵匯出官方白單</span>
+    <span class="tag">編碼原則 第19版</span>
+  </div>
+
+  <!-- shared header -->
+  <div class="panel shared">
+    <div class="fld"><label>測試日期</label><input id="h_date" type="date"></div>
+    <div class="fld"><label>預約編號</label><input id="h_book" placeholder="TU260000"></div>
+    <div class="fld"><label>客戶（整張單共用，自動帶入編號 14–17 位）</label><input id="h_cust" list="custlist" placeholder="e.g. Barco(L5444)" autocomplete="off"><datalist id="custlist"></datalist></div>
+    <div class="fld"><label>連絡人</label><input id="h_contact"></div>
+  </div>
+
+  <div id="records"></div>
+</div>
+
+<div class="actions">
+  <div class="inner">
+    <button class="btn add" id="addRec">＋ 新增一筆（最多 3 筆）</button>
+    <span class="sub" id="recCount" style="color:var(--muted);font-size:12.5px"></span>
+    <button class="btn primary" id="exportBtn">匯出官方白單 Excel</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script id="coding-data" type="application/json">{"TYPE": [{"code": "N", "desc": "NVH"}, {"code": "U", "desc": "Audio"}, {"code": "V", "desc": "Video"}, {"code": "R", "desc": "Speech"}, {"code": "I", "desc": "Chamber Built"}, {"code": "C", "desc": "Integrity"}], "MODE": [{"code": "TS", "desc": "Teams Audio", "brand": "Microsoft"}, {"code": "TF", "desc": "Teams Function", "brand": "Microsoft"}, {"code": "CT", "desc": "Cortana", "brand": "Microsoft"}, {"code": "MS", "desc": "MOS (Mean Opinion Score)", "brand": "Microsoft"}, {"code": "RT", "desc": "RTC (Real Time Communication)", "brand": "Microsoft"}, {"code": "EE", "desc": "E2E", "brand": "Microsoft"}, {"code": "TA", "desc": "TAS", "brand": "Microsoft"}, {"code": "ZM", "desc": "Zoom Audio", "brand": "Zoom"}, {"code": "ZA", "desc": "Zoom AIO", "brand": "Zoom"}, {"code": "ZF", "desc": "Zoom Function", "brand": "Zoom"}, {"code": "ZC", "desc": "Zoom Controller", "brand": "Zoom"}, {"code": "ZP", "desc": "Zoom Scheduler", "brand": "Zoom"}, {"code": "EE", "desc": "E2E", "brand": "Zoom"}, {"code": "CA", "desc": "Chromebook Audio", "brand": "Google"}, {"code": "CS", "desc": "Chromebook Stylus", "brand": "Google"}, {"code": "GC", "desc": "Google CFM", "brand": "Google"}, {"code": "GF", "desc": "Google CFM Function", "brand": "Google"}, {"code": "TO", "desc": "Chromebook Touch", "brand": "Google"}, {"code": "LQ", "desc": "Lenovo Speech Quality", "brand": "Lenovo"}, {"code": "LS", "desc": "Lenovo Speaker Performance", "brand": "Lenovo"}, {"code": "DN", "desc": "DNN", "brand": "Lenovo"}, {"code": "DV", "desc": "Dell VOIP", "brand": "DELL"}, {"code": "CP", "desc": "Carplay", "brand": "Apple"}, {"code": "DX", "desc": "DXO", "brand": "DXO"}, {"code": "E1", "desc": "EN50332-1", "brand": "ISO"}, {"code": "E2", "desc": "EN50332-2", "brand": "ISO"}, {"code": "SC", "desc": "Test with Soundcheck", "brand": "Basic performance"}, {"code": "AP", "desc": "Test with AP", "brand": "Basic performance"}, {"code": "SC", "desc": "Special Case", "brand": "Other"}, {"code": "SP", "desc": "SPET", "brand": "Intel"}, {"code": "BA", "desc": "BT Audio", "brand": "Intel"}], "CONN": [{"code": "0", "desc": "No Wired"}, {"code": "1", "desc": "USB Wired"}, {"code": "2", "desc": "Wireless with USB Dongle"}, {"code": "3", "desc": "Bluetooh"}, {"code": "4", "desc": "POE (Power over Ethernet)"}], "SPEC": [{"code": "000", "desc": "No Edition"}, {"code": "040", "desc": "Teams V4"}, {"code": "050", "desc": "Teams V5"}, {"code": "101", "desc": "Cortana V10.1"}, {"code": "018", "desc": "RTC1.8"}, {"code": "019", "desc": "RTC1.9"}, {"code": "010", "desc": "TalkAnalysisSuite_Guide_v1.0"}, {"code": "300", "desc": "No Edition"}, {"code": "325", "desc": "Zoom Rooms Audio V2.5"}, {"code": "323", "desc": "Zoom AIO V2.3 (Include FW-Test)"}, {"code": "425", "desc": "Zoom AIO V2.5 (Include FW-Test)"}, {"code": "340", "desc": "Zoom FW-TEST Android V4.0 (Only)"}, {"code": "342", "desc": "Zoom FW-TEST Android V4.2 (Only)"}, {"code": "320", "desc": "Zoom FW-TEST Window V2.0(Only)"}, {"code": "324", "desc": "Zoom FW-TEST Window V2.4(Only)"}, {"code": "330", "desc": "ZR Controller (ZRC) V3.0"}, {"code": "331", "desc": "ZR Scheduler (ZRP) V3.1"}, {"code": "310", "desc": "Digital Signage_V 1.0"}, {"code": "500", "desc": "No Edition"}, {"code": "520", "desc": "Stylus_Design_Verification _v2.0_ChromeOS"}, {"code": "513", "desc": "Finger Touch Design Verification Document"}, {"code": "517", "desc": "Audio System Qualification v1.7"}, {"code": "036", "desc": "Lenovo_Thermal_ and Acoustic_Spec V3.6.9"}, {"code": "037", "desc": "Lenovo_Thermal_ and Acoustic_Spec V3.7.3"}, {"code": "015", "desc": "DNN V1.5"}, {"code": "000", "desc": "No Edition"}, {"code": "008", "desc": "HAE-car_HAE-BGN_Rev8"}, {"code": "000", "desc": "No Edition"}, {"code": "013", "desc": "EN50332 (2013)"}, {"code": "000", "desc": "No Edition"}, {"code": "000", "desc": "No Edition"}, {"code": "113", "desc": "Speech Platform Evaluation Toolset_V1.13"}], "MIC": [{"code": "N", "desc": "No Mic."}, {"code": "A", "desc": "46AC"}, {"code": "B", "desc": "46AE"}, {"code": "C", "desc": "46AF"}, {"code": "D", "desc": "26AK"}, {"code": "E", "desc": "46BP"}, {"code": "F", "desc": "2690+40AN"}, {"code": "G", "desc": "40AE(26CA)"}, {"code": "H", "desc": "40AE(26CA) +46BP"}, {"code": "I", "desc": "M30"}], "EQUIP": [{"code": "00", "desc": "Human"}, {"code": "01", "desc": "Labcore +BGN/3PASS"}, {"code": "02", "desc": "AP (Audio Precision)"}, {"code": "03", "desc": "Listen Amp connect 621"}, {"code": "04", "desc": "BGN (Background Noise)"}, {"code": "05", "desc": "3PASS"}, {"code": "06", "desc": "PC+Soundcard"}, {"code": "07", "desc": "Touch Robot"}, {"code": "08", "desc": "Stylus Robot"}, {"code": "09", "desc": "Listen Amp connect ISC"}, {"code": "10", "desc": "RF Shielded Box"}], "HEAD": [{"code": "0", "desc": "None"}, {"code": "1", "desc": "HMSII.3"}, {"code": "2", "desc": "BK 4128C"}, {"code": "3", "desc": "GRAS 44AA"}, {"code": "4", "desc": "HMSII.3 + GRAS 44AA"}, {"code": "5", "desc": "BK 4128C + GRAS 44AA"}, {"code": "6", "desc": "Min12"}, {"code": "7", "desc": "8351B"}, {"code": "8", "desc": "8331A"}], "REQ": [{"code": "DB", "desc": "Debug"}, {"code": "QA", "desc": "Qualification"}, {"code": "RQ", "desc": "Re-Qualification"}, {"code": "PT", "desc": "Pre-Test"}, {"code": "SO", "desc": "Special Offer"}, {"code": "FS", "desc": "Free Support"}, {"code": "LF", "desc": "Lenovo Full Round 1"}, {"code": "LS", "desc": "Lenovo Full Round 2"}, {"code": "LT", "desc": "Pre-Test"}], "CUST": [{"code": "4580", "desc": "Yealink"}, {"code": "4917", "desc": "Neat"}, {"code": "4070", "desc": "Logi"}, {"code": "1120", "desc": "Wistron"}, {"code": "4716", "desc": "Tymphany"}, {"code": "5250", "desc": "Crestron"}, {"code": "4695", "desc": "Luxshare"}, {"code": "4321", "desc": "Merry"}, {"code": "4042", "desc": "Pegatron"}, {"code": "0024", "desc": "Compal"}, {"code": "4494", "desc": "LCFC"}, {"code": "0044", "desc": "Quanta"}, {"code": "5444", "desc": "Barco"}, {"code": "4364", "desc": "Aver"}, {"code": "4872", "desc": "Huaqin"}, {"code": "0041", "desc": "Acer"}, {"code": "4273", "desc": "Szhorn"}, {"code": "0065", "desc": "BenQ"}, {"code": "4107", "desc": "TUV"}, {"code": "4562", "desc": "ZilltekL"}, {"code": "4183", "desc": "Amtran"}, {"code": "4220", "desc": "Foxconn"}, {"code": "4484", "desc": "HP"}, {"code": "0130", "desc": "AVC"}, {"code": "4190", "desc": "MCT"}, {"code": "0016", "desc": "TPV"}, {"code": "4943", "desc": "Dynabook"}, {"code": "4333", "desc": "Cirrus"}, {"code": "4853", "desc": "CDR"}, {"code": "0039", "desc": "ASUS"}, {"code": "4031", "desc": "Inventec"}], "PROD": [{"code": "2W", "desc": "2 Wheels"}, {"code": "4W", "desc": "4 Wheels"}, {"code": "AM", "desc": "A-Mic"}, {"code": "AO", "desc": "AIO"}, {"code": "BH", "desc": "NBT Headset (Native Bluetooth)"}, {"code": "BS", "desc": "NBT Speakerphone"}, {"code": "CB", "desc": "Chromebook"}, {"code": "CC", "desc": "Conferencing Camera"}, {"code": "CD", "desc": "Collaboration Display"}, {"code": "CS", "desc": "Conferencing Speakerphones"}, {"code": "CX", "desc": "Chromebox"}, {"code": "DM", "desc": "D-Mic"}, {"code": "DP", "desc": "DSP System (Digital Signal Processing)"}, {"code": "DT", "desc": "Desktop"}, {"code": "HS", "desc": "Handsets"}, {"code": "IS", "desc": "Intelligent Speaker"}, {"code": "MD", "desc": "Mobile Phone Dock"}, {"code": "NB", "desc": "Notebook"}, {"code": "OH", "desc": "Open Office Headset"}, {"code": "PM", "desc": "Personal Monitor"}, {"code": "PS", "desc": "Personal Speakerphone"}, {"code": "SB", "desc": "Soundbar"}, {"code": "SK", "desc": "Speaker"}, {"code": "ST", "desc": "Stylus"}, {"code": "TA", "desc": "Teams Rooms on Android"}, {"code": "TB", "desc": "Tablet"}, {"code": "TV", "desc": "Big Screen TV"}, {"code": "TW", "desc": "Teams Rooms on Windows"}, {"code": "UC", "desc": "USB Camera"}, {"code": "UD", "desc": "USB Desk Phones"}, {"code": "UH", "desc": "USB Headset"}, {"code": "AD", "desc": "Android Desk phone"}, {"code": "CR", "desc": "Controller"}, {"code": "SR", "desc": "Scheduler"}, {"code": "HI", "desc": "Handheld Item"}]}</script>
+<script id="tpl-data" type="text/plain">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</script>
+<script>
+const CODING = JSON.parse(document.getElementById('coding-data').textContent);
+
+// product code segments in order: [key, width, label, dataKey, hasBrand]
+const SEGS = [
+  {key:'type', w:1, label:'Type 類別',        data:'TYPE'},
+  {key:'mode', w:2, label:'Mode 模式',        data:'MODE', brand:true},
+  {key:'conn', w:1, label:'連線方式',          data:'CONN'},
+  {key:'spec', w:3, label:'SPEC 版本',         data:'SPEC'},
+  {key:'mic',  w:1, label:'麥克風',            data:'MIC'},
+  {key:'equip',w:2, label:'測試設備',          data:'EQUIP'},
+  {key:'head', w:1, label:'人頭/人工嘴/喇叭',  data:'HEAD'},
+  {key:'req',  w:2, label:'測試需求',          data:'REQ'},
+  {key:'cust', w:4, label:'客戶編號',          data:'CUST'},
+  {key:'prod', w:2, label:'產品別',            data:'PROD'},
+  {key:'ver',  w:1, label:'進版號',            data:'VER'},
+];
+const TIME_LABELS = ['A架設時間','B測試時間','C收拾時間','D報告時間','E等待時間','F取消時間','G拆箱時間','H裝機時間'];
+
+let records = [];
+let uid = 0;
+let sharedCust = '';       // 從客戶欄位抓出的 4 碼編號（帶入產品編號 14–17 位）
+let sharedCustText = '';   // 客戶欄位的原始輸入文字（寫入白單表頭）
+function extractCust(text){ const m=String(text||'').match(/(\d{4})/); return m?m[1]:''; }
+function segVal(rec, s){ return s.key==='cust' ? sharedCust : (rec.sel[s.key]||''); }
+
+/* 自訂客戶記憶：清單外的客戶輸入後存到瀏覽器本機，下次自動帶出。
+   下載後執行或部署到 GitHub Pages 時可正常保存；Claude 內預覽因沙箱限制不保存。 */
+const CUST_LS='aclab_baidan_custmap';
+function loadCustMap(){ try{ return JSON.parse(localStorage.getItem(CUST_LS)||'{}'); }catch(e){ return {}; } }
+function saveCustMap(){ try{ localStorage.setItem(CUST_LS, JSON.stringify(custMap)); }catch(e){} }
+let custMap = loadCustMap();   // { "1234": "原始輸入文字" }
+function custName(code){
+  const b=CODING.CUST.find(x=>String(x.code)===String(code));
+  if(b) return b.desc;
+  if(custMap[code]) return custMap[code].replace(/\s*[\(（].*$/,'').trim() || custMap[code];
+  return '';
+}
+function rememberCust(){
+  if(sharedCust && /\S/.test(sharedCustText) && !CODING.CUST.some(x=>String(x.code)===sharedCust)){
+    custMap[sharedCust]=sharedCustText.trim(); saveCustMap(); refreshDatalist();
+  }
+}
+function refreshDatalist(){
+  const dl=document.getElementById('custlist'); if(!dl) return;
+  const saved=Object.values(custMap);
+  const builtin=CODING.CUST.map(x=>`${x.desc} (${x.code})`);
+  const seen=new Set(); const out=[];
+  [...saved,...builtin].forEach(t=>{ if(t&&!seen.has(t)){ seen.add(t); out.push(t); } });
+  dl.innerHTML=out.map(t=>`<option value="${String(t).replace(/"/g,'&quot;')}"></option>`).join('');
+}
+function blankRecord(){
+  return {
+    id:++uid,
+    sel:{type:'',mode:'',conn:'',spec:'',mic:'',equip:'',head:'',req:'',prod:'',ver:'1'},
+    erpEdited:false, erp:'',
+    order:'', lab:'', eng:'', brand:'', proj:'', dut:'', serial:'',
+    times: TIME_LABELS.map(()=>({start:'',end:'',hr:'',hrEdited:false}))
+  };
+}
+
+/* ---------- code + erp logic ---------- */
+function descFor(dataKey, code){
+  if(dataKey==='VER') return 'version';
+  const list = CODING[dataKey]||[];
+  const hit = list.find(x=>String(x.code)===String(code));
+  if(hit) return hit.desc;
+  if(dataKey==='CUST') return custName(code);   // 含本機記住的自訂客戶
+  return '';
+}
+function fullCode(rec){
+  return SEGS.map(s=>{
+    const v = segVal(rec,s);
+    if(!v) return '·'.repeat(s.w);
+    return v;
+  }).join('');
+}
+function isComplete(rec){
+  return SEGS.every(s=> segVal(rec,s) !== '');
+}
+function genErp(rec){
+  const parts = SEGS.map(s=>{
+    const v = segVal(rec,s);
+    if(!v) return null;
+    if(s.key==='ver') return `${v}:version`;
+    return `${v}:${descFor(s.data,v)}`;
+  }).filter(Boolean);
+  return parts.join(' ');
+}
+
+/* ---------- time logic: hours with lunch (12:00-13:00) deduction ---------- */
+function toMin(t){ if(!t||!/^\d{1,2}:\d{2}$/.test(t)) return null; const [h,m]=t.split(':').map(Number); return h*60+m; }
+function calcHr(start,end){
+  const s=toMin(start), e=toMin(end);
+  if(s===null||e===null) return {hr:'',lunch:false};
+  let dur=e-s; if(dur<0) dur=0;
+  // overlap with lunch window 720..780
+  const ov=Math.max(0, Math.min(e,780)-Math.max(s,720));
+  dur-=Math.min(60,ov<0?0:ov);
+  if(dur<0) dur=0;
+  const hr=dur/60;
+  return {hr: Number.isInteger(hr)?String(hr):hr.toFixed(2).replace(/0$/,'').replace(/\.$/,''), lunch: ov>0};
+}
+function fmtRange(start,end){
+  const a=start&&/^\d{1,2}:\d{2}$/.test(start)?start:'00:00';
+  const b=end&&/^\d{1,2}:\d{2}$/.test(end)?end:'00:00';
+  return `${a}~${b}`;
+}
+function timeField(rid,i,k,val){
+  return `<div class="tp" data-rid="${rid}" data-tidx="${i}" data-tk="${k}">
+    <button type="button" class="tp-trigger ${val?'':'ph'}">
+      <span class="tp-val">${val?to12(val):'--:--'}</span>
+      <svg class="tp-clock" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 4.4V8l2.5 1.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="tp-pop hidden"></div>
+  </div>`;
+}
+/* 12 小時 <-> 24 小時內部值 */
+function parse12(hhmm){
+  if(!hhmm||!/^\d{2}:\d{2}$/.test(hhmm)) return {ap:'',h:'',m:''};
+  const H=+hhmm.slice(0,2), M=hhmm.slice(3);
+  let h12=H%12; if(h12===0) h12=12;
+  return {ap:H<12?'AM':'PM', h:h12, m:M};
+}
+function to24(ap,h12,m){ let h=(+h12)%12; if(ap==='PM') h+=12; return `${String(h).padStart(2,'0')}:${m}`; }
+function to12(hhmm){ const p=parse12(hhmm); if(!p.ap) return '--:--'; return `${p.ap==='AM'?'上午':'下午'} ${String(p.h).padStart(2,'0')}:${p.m}`; }
+
+function closeAllPops(){ document.querySelectorAll('.tp-pop').forEach(p=>p.classList.add('hidden')); }
+function liveRefresh(rec, i){
+  const card=document.querySelector(`.rec[data-rid="${rec.id}"]`); if(!card) return;
+  const t=rec.times[i], c=calcHr(t.start,t.end);
+  const row=card.querySelectorAll('.trow')[i];
+  const hrInput=row && row.querySelector('input.hr');
+  if(hrInput){ hrInput.value = t.hrEdited? t.hr : c.hr; hrInput.classList.toggle('lunch', !t.hrEdited && c.lunch); }
+  updateTotal(rec);
+}
+function pickPart(trigger, pop, rid, i, k, part, val){
+  const r=getRec(rid);
+  const p=parse12(r.times[i][k]);
+  let ap=p.ap||'AM', h=p.h||9, m=p.m||'00';
+  if(part==='ap') ap=val; else if(part==='h') h=+val; else m=val;
+  const nv=to24(ap,h,m);
+  r.times[i][k]=nv; r.times[i].hrEdited=false;
+  trigger.querySelector('.tp-val').textContent=to12(nv); trigger.classList.remove('ph');
+  pop.querySelectorAll('.tp-opt[data-part="ap"]').forEach(o=>o.classList.toggle('sel',o.dataset.v===ap));
+  pop.querySelectorAll('.tp-opt[data-part="h"]').forEach(o=>o.classList.toggle('sel',+o.dataset.v===h));
+  pop.querySelectorAll('.tp-opt[data-part="m"]').forEach(o=>o.classList.toggle('sel',o.dataset.v===m));
+  liveRefresh(r,i);
+}
+function openPop(trigger, pop, rid, i, k){
+  const p=parse12(getRec(rid).times[i][k]);
+  const aps=[['AM','上午'],['PM','下午']].map(([v,l])=>`<div class="tp-opt ${p.ap===v?'sel':''}" data-part="ap" data-v="${v}">${l}</div>`).join('');
+  let hrs=''; for(let h=1;h<=12;h++){ hrs+=`<div class="tp-opt ${p.h===h?'sel':''}" data-part="h" data-v="${h}">${String(h).padStart(2,'0')}</div>`; }
+  const mins=['00','30'].map(v=>`<div class="tp-opt ${p.m===v?'sel':''}" data-part="m" data-v="${v}">${v}</div>`).join('');
+  pop.innerHTML = `<div class="tp-col tp-ap">${aps}</div><div class="tp-col tp-h">${hrs}</div><div class="tp-col tp-m">${mins}</div>`;
+  pop.classList.remove('hidden');
+  const sh=pop.querySelector('.tp-opt[data-part="h"].sel'), hcol=pop.querySelector('.tp-h');
+  if(sh&&hcol) hcol.scrollTop = sh.offsetTop - hcol.clientHeight/2 + sh.offsetHeight/2;
+  pop.querySelectorAll('.tp-opt').forEach(o=>{ o.onclick=(e)=>{ e.stopPropagation(); pickPart(trigger,pop,rid,i,k,o.dataset.part,o.dataset.v); }; });
+}
+
+/* ---------- rendering ---------- */
+function optionHtml(dataKey, selected){
+  if(dataKey==='VER'){
+    let o='';
+    for(let i=1;i<=9;i++) o+=`<option value="${i}" ${String(selected)===String(i)?'selected':''}>${i}</option>`;
+    return o;
+  }
+  const list = CODING[dataKey]||[];
+  let o = `<option value="">— 請選擇 —</option>`;
+  if(dataKey==='MODE'){
+    const brands=[]; list.forEach(x=>{ if(!brands.includes(x.brand)) brands.push(x.brand); });
+    brands.forEach(b=>{
+      o+=`<optgroup label="${b}">`;
+      list.filter(x=>x.brand===b).forEach(x=>{
+        o+=`<option value="${x.code}" ${selected===x.code?'selected':''}>${x.code} — ${x.desc}</option>`;
+      });
+      o+=`</optgroup>`;
+    });
+    return o;
+  }
+  list.forEach(x=>{
+    o+=`<option value="${x.code}" ${selected===String(x.code)?'selected':''}>${x.code} — ${x.desc}</option>`;
+  });
+  return o;
+}
+
+function renderRecord(rec, idx){
+  const erpVal = rec.erpEdited ? rec.erp : genErp(rec);
+  const segHtml = SEGS.map(s=>{
+    const v=segVal(rec,s);
+    const chars = v ? v.split('') : Array(s.w).fill('');
+    return chars.map((c,i)=>`<div class="seg ${c?'':'empty'}"><span class="ch">${c||'·'}</span><span class="pl">${posLabel(s,i)}</span></div>`).join('');
+  }).join('');
+
+  const codeSelects = SEGS.map(s=>{
+    if(s.key==='cust'){
+      let txt, muted=false;
+      if(sharedCust){
+        const nm=custName(sharedCust);
+        const known=CODING.CUST.some(x=>String(x.code)===sharedCust);
+        txt = nm ? `${sharedCust} — ${nm}${known?'':'（新客戶 · 已記住）'}` : `${sharedCust}（新客戶 · 已記住）`;
+      } else { txt='↑ 在上方「客戶」填入含 4 碼編號的客戶'; muted=true; }
+      return `<div class="fld">
+        <label><span class="pos">${posTag(s)}</span> ${s.label}</label>
+        <div class="cust-ro ${muted?'muted':''}">${txt}</div>
+      </div>`;
+    }
+    return `<div class="fld">
+      <label><span class="pos">${posTag(s)}</span> ${s.label}</label>
+      <select data-rid="${rec.id}" data-seg="${s.key}" data-data="${s.data}">${optionHtml(s.data, rec.sel[s.key])}</select>
+    </div>`;
+  }).join('');
+
+  const timeRows = rec.times.map((t,i)=>{
+    const c = calcHr(t.start,t.end);
+    const shownHr = t.hrEdited ? t.hr : c.hr;
+    return `<div class="trow">
+      <span class="lbl">${TIME_LABELS[i]}</span>
+      ${timeField(rec.id,i,'start',t.start)}
+      ${timeField(rec.id,i,'end',t.end)}
+      <input class="hr ${(!t.hrEdited&&c.lunch)?'lunch':''}" data-rid="${rec.id}" data-tidx="${i}" data-tk="hr" value="${shownHr}" placeholder="0" inputmode="decimal">
+      <span class="u">hr</span>
+    </div>`;
+  }).join('');
+  const totalHr = rec.times.reduce((a,t)=>{ const c=calcHr(t.start,t.end); const v=parseFloat(t.hrEdited?t.hr:c.hr); return a+(isNaN(v)?0:v); },0);
+
+  return `
+  <div class="panel rec" data-rid="${rec.id}">
+    <div class="rec-head">
+      <span class="rec-no">${idx+1}</span>
+      <span class="ttl">記錄 ${idx+1}</span>
+      <button class="rm" data-rm="${rec.id}">移除</button>
+    </div>
+    <div class="rec-body">
+      <div class="grid2">
+        <div>
+          <p class="sect-t">產品編號 — 依編碼原則選擇</p>
+          <div class="codegrid">${codeSelects}</div>
+          <div class="readout">
+            <div class="ro-segs">${segHtml}</div>
+            <div class="ro-full">
+              <span class="code">${fullCodeHtml(rec)}</span>
+              <button class="copybtn" data-copy="code" data-rid="${rec.id}">複製 20 碼</button>
+            </div>
+          </div>
+          <div class="erp-wrap">
+            <div class="erp-head">
+              <p class="sect-t">ERP 多行描述（可手動微調）</p>
+              <div style="display:flex;gap:6px">
+                ${rec.erpEdited?`<button class="copybtn" data-regen="${rec.id}" style="color:var(--muted)">重設為自動</button>`:''}
+                <button class="copybtn" data-copy="erp" data-rid="${rec.id}">複製描述</button>
+              </div>
+            </div>
+            <textarea data-rid="${rec.id}" data-erp="1">${erpVal}</textarea>
+          </div>
+        </div>
+        <div>
+          <p class="sect-t">訂單與測試資訊</p>
+          <div class="inforows">
+            <div class="fld full"><label>訂單單號 Order No.</label><input data-rid="${rec.id}" data-f="order" value="${esc(rec.order)}"></div>
+            <div class="fld"><label>Lab No.</label><input data-rid="${rec.id}" data-f="lab" value="${esc(rec.lab)}" placeholder="A7"></div>
+            <div class="fld"><label>DUT 數量</label><input data-rid="${rec.id}" data-f="dut" value="${esc(rec.dut)}" inputmode="numeric"></div>
+            <div class="fld full"><label>測試工程師</label><input data-rid="${rec.id}" data-f="eng" value="${esc(rec.eng)}"></div>
+            <div class="fld"><label>品牌</label><input data-rid="${rec.id}" data-f="brand" value="${esc(rec.brand)}"></div>
+            <div class="fld"><label>訂單流水號</label><input data-rid="${rec.id}" data-f="serial" value="${esc(rec.serial)}"></div>
+            <div class="fld full"><label>專案名稱</label><input data-rid="${rec.id}" data-f="proj" value="${esc(rec.proj)}"></div>
+          </div>
+          <div class="times">
+            <div class="timehdr"><p class="sect-t">工時</p><span class="hint">跨 12:00–13:00 自動扣 1 小時午休 · hr 可手動覆寫</span></div>
+            ${timeRows}
+            <div class="tsum">合計工時：<b>${Number.isInteger(totalHr)?totalHr:totalHr.toFixed(2)}</b> hr</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+function posTag(s){
+  const start = SEGS.slice(0,SEGS.indexOf(s)).reduce((a,x)=>a+x.w,0)+1;
+  return s.w===1?`${start}`:`${start}–${start+s.w-1}`;
+}
+function posLabel(s,i){
+  const start = SEGS.slice(0,SEGS.indexOf(s)).reduce((a,x)=>a+x.w,0)+1;
+  return start+i;
+}
+function fullCodeHtml(rec){
+  return SEGS.map(s=>{
+    const v=segVal(rec,s);
+    return v? v : `<span class="miss">${'·'.repeat(s.w)}</span>`;
+  }).join('');
+}
+function esc(v){ return String(v??'').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+function render(){
+  const root=document.getElementById('records');
+  root.innerHTML = records.map((r,i)=>renderRecord(r,i)).join('');
+  document.getElementById('addRec').disabled = records.length>=3;
+  document.getElementById('recCount').textContent = `目前 ${records.length} / 3 筆`;
+  bind();
+}
+
+/* ---------- events ---------- */
+function bind(){
+  document.querySelectorAll('select[data-seg]').forEach(el=>{
+    el.onchange=()=>{ const r=getRec(el.dataset.rid); r.sel[el.dataset.seg]=el.value; r.erpEdited=false; render(); };
+  });
+  document.querySelectorAll('input[data-f]').forEach(el=>{
+    el.oninput=()=>{ getRec(el.dataset.rid)[el.dataset.f]=el.value; };
+  });
+  document.querySelectorAll('textarea[data-erp]').forEach(el=>{
+    el.oninput=()=>{ const r=getRec(el.dataset.rid); r.erpEdited=true; r.erp=el.value; };
+  });
+  document.querySelectorAll('input.hr[data-tk="hr"]').forEach(el=>{
+    el.oninput=()=>{ const r=getRec(el.dataset.rid), i=+el.dataset.tidx; r.times[i].hrEdited=true; r.times[i].hr=el.value; updateTotal(r); };
+  });
+  document.querySelectorAll('.tp').forEach(tp=>{
+    const rid=tp.dataset.rid, i=+tp.dataset.tidx, k=tp.dataset.tk;
+    const trigger=tp.querySelector('.tp-trigger'), pop=tp.querySelector('.tp-pop');
+    trigger.onclick=(e)=>{ e.stopPropagation(); const wasOpen=!pop.classList.contains('hidden'); closeAllPops(); if(!wasOpen) openPop(trigger,pop,rid,i,k); };
+  });
+  document.querySelectorAll('[data-rm]').forEach(el=>{
+    el.onclick=()=>{ records=records.filter(r=>String(r.id)!==el.dataset.rm); if(!records.length) records.push(blankRecord()); render(); };
+  });
+  document.querySelectorAll('[data-copy]').forEach(el=>{
+    el.onclick=()=>{ const r=getRec(el.dataset.rid);
+      const txt = el.dataset.copy==='code' ? (isComplete(r)?fullCode(r):fullCode(r)) : (r.erpEdited?r.erp:genErp(r));
+      navigator.clipboard.writeText(txt).then(()=>toast(el.dataset.copy==='code'?'已複製 20 碼':'已複製 ERP 描述'));
+    };
+  });
+  document.querySelectorAll('[data-regen]').forEach(el=>{
+    el.onclick=()=>{ const r=getRec(el.dataset.regen); r.erpEdited=false; r.erp=''; render(); };
+  });
+}
+function getRec(id){ return records.find(r=>String(r.id)===String(id)); }
+function updateTotal(rec){
+  const card=document.querySelector(`.rec[data-rid="${rec.id}"]`);
+  if(!card) return;
+  const total=rec.times.reduce((a,t)=>{ const c=calcHr(t.start,t.end); const v=parseFloat(t.hrEdited?t.hr:c.hr); return a+(isNaN(v)?0:v);},0);
+  const b=card.querySelector('.tsum b'); if(b) b.textContent=Number.isInteger(total)?total:total.toFixed(2);
+}
+
+document.getElementById('addRec').onclick=()=>{ if(records.length<3){ records.push(blankRecord()); render(); } };
+
+/* ---------- toast ---------- */
+let toastT;
+function toast(msg,isErr){
+  const el=document.getElementById('toast'); el.textContent=msg;
+  el.className='toast show'+(isErr?' err':''); clearTimeout(toastT);
+  toastT=setTimeout(()=>el.className='toast',2200);
+}
+
+/* ---------- export to official xlsx (ExcelJS keeps all formatting) ---------- */
+const TPL_B64 = document.getElementById('tpl-data').textContent.trim();
+function b64ToU8(b64){ const bin=atob(b64); const u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); return u; }
+const BLOCKS=[2,12,22]; // start row of each record block
+function colL(n){ let s=''; while(n>0){ const m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=(n-m-1)/26; } return s; }
+function setCell(ws,addr,val){
+  if(val===''||val===null||val===undefined) return;
+  ws.getCell(addr).value = val;   // ExcelJS keeps the cell's existing style
+}
+function numOrStr(v){ const n=parseFloat(v); return (!isNaN(n)&&String(n)===String(v).trim())?n:v; }
+function pad2(n){ return String(n).padStart(2,'0'); }
+function writeBlock(ws,bs,rec){
+  // product code chars -> row bs+1, cols E(5)..X(24)
+  let col=0;
+  SEGS.forEach(s=>{
+    const v=segVal(rec,s);
+    const chars = v? v.split('') : [];
+    for(let i=0;i<s.w;i++){ const ch=chars[i]; if(ch) setCell(ws, colL(5+col+i)+(bs+1), ch); }
+    col+=s.w;
+  });
+  setCell(ws,'B'+(bs+2),rec.order);
+  setCell(ws,'E'+(bs+2),rec.lab);
+  setCell(ws,'E'+(bs+3),rec.eng);
+  setCell(ws,'E'+(bs+4),rec.brand);
+  setCell(ws,'E'+(bs+5),rec.proj);
+  if(rec.dut!=='') setCell(ws,'E'+(bs+6),numOrStr(rec.dut));
+  setCell(ws,'AA'+(bs+2),rec.serial);
+  setCell(ws,'P'+(bs+3), rec.erpEdited? rec.erp : genErp(rec));
+  rec.times.forEach((t,i)=>{
+    const c=calcHr(t.start,t.end);
+    const hrStr = t.hrEdited? t.hr : c.hr;
+    // only write a time range if the row actually has times
+    if(t.start||t.end) setCell(ws,'K'+(bs+2+i), fmtRange(t.start,t.end));
+    if(hrStr!==''&&hrStr!==undefined){ const n=parseFloat(hrStr); setCell(ws,'N'+(bs+2+i), isNaN(n)?hrStr:n); }
+  });
+}
+async function doExport(){
+  if(typeof ExcelJS==='undefined'){ toast('匯出元件尚未載入，請確認網路連線後重試',true); return; }
+  const btn=document.getElementById('exportBtn'); const prev=btn.textContent;
+  btn.disabled=true; btn.textContent='匯出中…';
+  try{
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(b64ToU8(TPL_B64).buffer);
+    const ws = wb.getWorksheet('Audio');
+    const d=document.getElementById('h_date').value;
+    if(d){ const [,m,dd]=d.split('-'); setCell(ws,'B1',`測試日期: ${m}/${dd}`); }
+    const bk=document.getElementById('h_book').value.trim();
+    const ct=document.getElementById('h_contact').value.trim();
+    if(bk) setCell(ws,'E1',`預約編號: ${bk}`);
+    if(sharedCustText.trim()) setCell(ws,'J1',`客戶: ${sharedCustText.trim()}`);
+    if(ct) setCell(ws,'O1',`連絡人: ${ct}`);
+    records.forEach((r,i)=>{ if(i<3) writeBlock(ws,BLOCKS[i],r); });
+    const buf = await wb.xlsx.writeBuffer();
+    const stamp=new Date(); const fn=`Audio白單_${stamp.getFullYear()}${pad2(stamp.getMonth()+1)}${pad2(stamp.getDate())}.xlsx`;
+    const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const url=URL.createObjectURL(blob); const a=document.createElement('a');
+    a.href=url; a.download=fn; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1500);
+    toast('已匯出 '+fn);
+  }catch(err){ console.error(err); toast('匯出失敗：'+err.message,true); }
+  finally{ btn.disabled=false; btn.textContent=prev; }
+}
+document.getElementById('exportBtn').onclick=doExport;
+
+/* init */
+document.addEventListener('click', closeAllPops);
+(function initCustomer(){
+  const el=document.getElementById('h_cust');
+  refreshDatalist();
+  el.oninput=()=>{ sharedCustText=el.value; sharedCust=extractCust(el.value); rememberCust(); render(); };
+})();
+records.push(blankRecord());
+render();
+</script>
+</body>
+</html>
