@@ -816,6 +816,8 @@ async function doUpload(){
       records.forEach(r=>r.uploaded=hh);
       render();
       toast(`模板試算表：已新增 ${tj.added||0} 筆`);
+      // 暫時的診斷視窗，確認寫入位置後會移除
+      alert(`上傳成功（診斷資訊）\n試算表：${tj.ssName||'?'}\n分頁：${tj.sheet||'?'}\n表頭列：第 ${tj.headerRow||'?'} 列\n寫入列：第 ${tj.firstWriteRow||'?'} 列`);
     } else toast('上傳失敗：'+((tj&&tj.error)||'未知錯誤'),true);
   }catch(err){ toast('上傳失敗：'+err.message,true); }
   btn.disabled=false; btn.textContent=prev;
