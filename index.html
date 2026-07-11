@@ -815,7 +815,7 @@ async function doUpload(){
       const t=new Date(), hh=`${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
       records.forEach(r=>r.uploaded=hh);
       render();
-      toast(tj.fallback ? '已送出（保底通道），請開試算表確認' : `已上傳 ${tj.added||0} 筆，老闆檢視已同步更新`+(tj.verified?'（保底通道確認成功）':''));
+      toast(tj.fallback ? '已送出，請開試算表確認' : `上傳成功（${tj.added||0} 筆）`);
     } else toast('上傳失敗：'+((tj&&tj.error)||'未知錯誤'),true);
   }catch(err){ toast('上傳失敗：'+err.message,true); }
   btn.disabled=false; btn.textContent=prev;
