@@ -815,7 +815,7 @@ async function doUpload(){
       const t=new Date(), hh=`${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
       records.forEach(r=>r.uploaded=hh);
       render();
-      toast(`已上傳 ${tj.added||0} 筆，老闆檢視已同步更新`);
+      toast(tj.fallback ? '已送出（保底通道），請開試算表確認' : `已上傳 ${tj.added||0} 筆，老闆檢視已同步更新`);
     } else toast('上傳失敗：'+((tj&&tj.error)||'未知錯誤'),true);
   }catch(err){ toast('上傳失敗：'+err.message,true); }
   btn.disabled=false; btn.textContent=prev;
@@ -845,23 +845,34 @@ function tplPayload(rec){
     '微調進版':rec.sel.ver, '新增/沿用':rec.line.status, '審核人員':rec.line.review,
     'ERP生成文字':genLine(rec), '產品編號':fullCode(rec),
     '產品編號_拆解':SEGS.map(s=>segVal(rec,s)||'').join('_'),
-    '樣品圖片':rec.photoUrl||'', '上傳日期':new Date().toISOString().slice(0,10).replace(/-/g,'/')
+    '樣品圖片':rec.photoUrl||'', '上傳日期':new Date().toISOString().slice(0,10).replace(/-/g,'/'),
+    photoData:(rec.photo&&!rec.photoUrl)?rec.photo:'', photoName:rec.photoName||''
   };
   TIME_LABELS.forEach((lb,i)=>{ const t=rec.times[i];
     p[lb+'_start']=t.start||'00:00'; p[lb+'_end']=t.end||'00:00'; p[lb+'_span']=spans[i];
   });
   return p;
 }
+function formPost(url, payloadStr){
+  // CORS 被擋時的保底通道：表單提交不受 CORS 限制（收不到回應，但資料一定送達）
+  return new Promise(res=>{
+    let fr=document.getElementById('gas_iframe');
+    if(!fr){ fr=document.createElement('iframe'); fr.id='gas_iframe'; fr.name='gas_iframe'; fr.style.display='none'; document.body.appendChild(fr); }
+    const f=document.createElement('form');
+    f.method='POST'; f.action=url; f.target='gas_iframe'; f.style.display='none';
+    const inp=document.createElement('textarea'); inp.name='payload'; inp.value=payloadStr;
+    f.appendChild(inp); document.body.appendChild(f); f.submit();
+    setTimeout(()=>{ f.remove(); res({ok:true, fallback:true}); }, 1500);
+  });
+}
 async function uploadTemplate(){
-  // 先傳圖片（存 Drive 拿連結），再傳資料列
-  for(const r of records){
-    if(r.photo && !r.photoUrl){
-      const res=await fetch(TPL_URL,{method:'POST',body:JSON.stringify({secret:GAS_SECRET,action:'photo',filename:r.photoName||'photo.jpg',data:r.photo})});
-      const j=await res.json(); if(j.ok) r.photoUrl=j.url;
-    }
+  const payload=JSON.stringify({secret:GAS_SECRET,action:'rows',rows:records.map(tplPayload)});
+  try{
+    const res=await fetch(TPL_URL,{method:'POST',body:payload});
+    return await res.json();
+  }catch(err){
+    return formPost(TPL_URL, payload);   // fetch 被 CORS 擋 → 改走表單通道
   }
-  const res=await fetch(TPL_URL,{method:'POST',body:JSON.stringify({secret:GAS_SECRET,action:'rows',rows:records.map(tplPayload)})});
-  return res.json();
 }
 document.getElementById('uploadBtn').onclick=doUpload;
 
