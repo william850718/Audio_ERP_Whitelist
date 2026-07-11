@@ -214,7 +214,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   <div class="inner">
     <button class="btn add" id="addRec">＋ 新增一筆（最多 3 筆）</button>
     <span class="sub" id="recCount" style="color:var(--muted);font-size:12.5px"></span>
-    <button class="btn" id="uploadBtn">上傳到模板試算表</button>
+    <button class="btn" id="uploadBtn">上傳到白單系統</button>
     <button class="btn primary" id="exportBtn">匯出白單（每筆一檔）</button>
   </div>
 </div>
@@ -799,13 +799,13 @@ document.getElementById('exportBtn').onclick=doExport;
 
 /* ---------- 上傳到模板試算表（Apps Script Web App） ---------- */
 const GAS_SECRET='audioWL2026';
-const TPL_URL='https://script.google.com/macros/s/AKfycbw-PZwyMuTyPYLXGx-8cFXqowbCVNJC8iF-FdWNxQouQOkVtB0j4kL_f0awehvGFwdtsw/exec';
+const TPL_URL='https://script.google.com/macros/s/AKfycbyC5_HfUcKBalA7dJGu1W_JwEivmpPXvrNeypcuebdQ7cftNG4JtkzupW44Q_54aG9cXA/exec';
 function hrOf(t){ const c=calcHr(t.start,t.end); const v=parseFloat(t.hrEdited?t.hr:c.hr); return isNaN(v)?0:v; }
 async function doUpload(){
   const btn=document.getElementById('uploadBtn');
   if(!TPL_URL){ toast('尚未設定模板試算表網址',true); return; }
   const incomplete=records.filter(r=>!isComplete(r)).length;
-  let msg=`確定要上傳 ${records.length} 筆記錄到模板試算表嗎？\n（目前重複上傳會產生重複列）`;
+  let msg=`確定要上傳 ${records.length} 筆記錄到白單系統嗎？\n（目前重複上傳會產生重複列）`;
   if(incomplete) msg+=`\n注意：有 ${incomplete} 筆產品編號尚未選完。`;
   if(!confirm(msg)) return;
   const prev=btn.textContent; btn.disabled=true; btn.textContent='上傳中…';
