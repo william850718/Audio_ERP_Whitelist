@@ -799,7 +799,7 @@ document.getElementById('exportBtn').onclick=doExport;
 
 /* ---------- 上傳到模板試算表（Apps Script Web App） ---------- */
 const GAS_SECRET='audioWL2026';
-const TPL_URL='https://script.google.com/macros/s/AKfycbzpDxX6eOuw7MKd7dersZv54z-tiOHJrD3OjdkVp7XX430xZ07wnUhQ3h5KJwyN4uKG/exec';
+const TPL_URL='https://script.google.com/macros/s/AKfycbz_5mkucKA8FHF3yFLnx-jlvf7Jzd4S-fVbDuZKWom0aOk7ne_m2VRPXlzehI3tjHlf/exec';
 function hrOf(t){ const c=calcHr(t.start,t.end); const v=parseFloat(t.hrEdited?t.hr:c.hr); return isNaN(v)?0:v; }
 async function doUpload(){
   const btn=document.getElementById('uploadBtn');
