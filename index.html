@@ -169,6 +169,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   .trow .hr.neg{border-color:var(--warn);color:var(--warn);background:rgba(229,72,77,.06)}
   .upbadge{margin-left:4px;font-size:11.5px;padding:2px 9px;border-radius:10px;background:#f1f2f4;color:#8a8f98;border:1px solid #e3e5e8;white-space:nowrap}
   .upbadge.ok{background:#e7f6ec;color:#1a7f37;border-color:#c6e8d2}
+  .photonote{font-size:11.5px;color:#1a7f37;margin-left:6px}
   .trow .u{font-size:11px;color:var(--muted)}
   .tsum{margin-top:8px;font-size:12px;color:var(--muted)}
   .tsum b{color:var(--ink);font-family:var(--mono)}
@@ -258,7 +259,8 @@ function blankRecord(){
     id:++uid,
     sel:{type:'U',mode:'',conn:'',spec:'',mic:'',equip:'',head:'',req:'',prod:'',ver:'1'},
     erpEdited:false, erp:'',
-    order:'', lab:'', eng:'', brand:'', proj:'', dut:'', serial:'',
+    order:'', lab:'', eng:'', brand:'', proj:'', dut:'', serial:'', storage:'', cnt:'1',
+    photo:'', photoName:'', photoUrl:'',
     times: TIME_LABELS.map(()=>({start:'',end:'',hr:'',hrEdited:false})),
     line:{ report:'', dutSrc:'客戶自帶', dutNo:'', billing:'auto', onsite:'', charge:'知道', review:'', status:'新增' },
     uploaded:''
@@ -330,11 +332,11 @@ function genErp(rec){
   const parts = SEGS.map(s=>{
     const v = segVal(rec,s);
     if(!v) return null;
-    if(s.key==='ver') return `${v}:version`;
-    if(s.key==='cust') return sharedCustName ? `${v}:${sharedCustName}` : `${v}`;
-    return `${v}:${descFor(s.data,v)}`;
+    if(s.key==='ver') return `${v} : version`;
+    if(s.key==='cust') return sharedCustName ? `${v} : ${sharedCustName}` : `${v}`;
+    return `${v} : ${descFor(s.data,v)}`;
   }).filter(Boolean);
-  return parts.join(' ');
+  return parts.join('\n');
 }
 
 /* ---------- time logic: hours with lunch (12:00-13:00) deduction ---------- */
@@ -530,6 +532,12 @@ function renderRecord(rec, idx){
             <div class="fld"><label>品牌</label><input data-rid="${rec.id}" data-f="brand" value="${esc(rec.brand)}"></div>
             <div class="fld"><label>訂單流水號 <span class="opt">(*選填)</span></label><input data-rid="${rec.id}" data-f="serial" value="${esc(rec.serial)}"></div>
             <div class="fld full"><label>專案名稱</label><input data-rid="${rec.id}" data-f="proj" value="${esc(rec.proj)}"></div>
+            <div class="fld"><label>樣品儲存 <span class="opt">(*選填)</span></label><input data-rid="${rec.id}" data-f="storage" value="${esc(rec.storage)}" placeholder="A7"></div>
+            <div class="fld"><label>測試筆數</label><input data-rid="${rec.id}" data-f="cnt" value="${esc(rec.cnt)}" inputmode="numeric"></div>
+            <div class="fld full"><label>架設圖 <span class="opt">(*選填，上傳到模板試算表用)</span></label>
+              <input type="file" accept="image/*" data-rid="${rec.id}" data-photo="1">
+              <span class="photonote">${rec.photoName?'已選擇：'+esc(rec.photoName):''}</span>
+            </div>
           </div>
           <div class="times">
             <div class="timehdr"><p class="sect-t">工時</p><span class="hint">跨 12:00–13:00 自動扣 1 小時午休 · hr 可手動覆寫</span></div>
@@ -601,6 +609,18 @@ function render(){
 }
 
 /* ---------- events ---------- */
+function compressImage(file, cb){
+  const img=new Image();
+  img.onload=()=>{
+    const max=1600; let w=img.width,h=img.height;
+    if(Math.max(w,h)>max){ const k=max/Math.max(w,h); w=Math.round(w*k); h=Math.round(h*k); }
+    const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+    cv.getContext('2d').drawImage(img,0,0,w,h);
+    cb(cv.toDataURL('image/jpeg',0.8));
+    URL.revokeObjectURL(img.src);
+  };
+  img.src=URL.createObjectURL(file);
+}
 function markDirty(r){
   if(!r || !r.uploaded) return;
   r.uploaded='';
@@ -663,6 +683,13 @@ function bind(){
       b.onclick=()=>{ const r=getRec(rid); r.line[key]=b.dataset.v; markDirty(r); render(); };
     });
   });
+  document.querySelectorAll('input[data-photo]').forEach(el=>{
+    el.onchange=()=>{ const r=getRec(el.dataset.rid); const f=el.files&&el.files[0]; if(!f||!r) return;
+      compressImage(f,(durl)=>{ r.photo=durl; r.photoUrl=''; r.photoName=f.name; markDirty(r);
+        const note=el.parentElement.querySelector('.photonote'); if(note) note.textContent='已選擇：'+f.name;
+      });
+    };
+  });
   document.querySelectorAll('[data-copyline]').forEach(el=>{
     el.onclick=()=>{ const r=getRec(el.dataset.copyline); navigator.clipboard.writeText(genLine(r)).then(()=>toast('已複製 LINE 訊息')); };
   });
@@ -717,6 +744,7 @@ function writeBlock(ws,bs,rec){
   if(rec.dut!=='') setCell(ws,'E'+(bs+6),numOrStr(rec.dut));
   setCell(ws,'AA'+(bs+2),rec.serial);
   setCell(ws,'P'+(bs+3), rec.erpEdited? rec.erp : genErp(rec));
+  try{ const pc=ws.getCell('P'+(bs+3)); pc.alignment=Object.assign({},pc.alignment,{wrapText:true}); }catch(e){}
   rec.times.forEach((t,i)=>{
     const c=calcHr(t.start,t.end);
     let hrStr = t.hrEdited? t.hr : c.hr;
@@ -772,6 +800,7 @@ document.getElementById('exportBtn').onclick=doExport;
 /* ---------- 上傳到 Google 結算試算表（Apps Script Web App） ---------- */
 const GAS_URL='https://script.google.com/macros/s/AKfycbysnLSpe1IYKJOw7VGN5N6l4tbwLH-9tt221duvYsbwAL62-li29FclEA9duVUQl7SlJA/exec';
 const GAS_SECRET='audioWL2026';
+const TPL_URL='';  // 模板試算表（Audio PAL ERP 編碼原則）的 Web App URL，部署後填入
 function hrOf(t){ const c=calcHr(t.start,t.end); const v=parseFloat(t.hrEdited?t.hr:c.hr); return isNaN(v)?0:v; }
 function recPayload(rec){
   const hrs=rec.times.map(hrOf);
@@ -802,9 +831,60 @@ async function doUpload(){
       render();
       toast(`已上傳試算表：新增 ${j.added||0} 筆、更新 ${j.updated||0} 筆`);
     }
+    if(TPL_URL){
+      btn.textContent='上傳模板中…';
+      try{
+        const tj=await uploadTemplate();
+        if(tj&&tj.ok) toast(`模板試算表：已新增 ${tj.added||0} 筆`);
+        else toast('模板上傳失敗：'+((tj&&tj.error)||'未知錯誤'),true);
+      }catch(e2){ toast('模板上傳失敗：'+e2.message,true); }
+    }
     else toast('上傳失敗：'+(j.error||'未知錯誤'),true);
   }catch(err){ toast('上傳失敗：'+err.message,true); }
   btn.disabled=false; btn.textContent=prev;
+}
+function segDesc(rec,s){
+  const v=segVal(rec,s); if(!v) return '';
+  if(s.key==='ver') return v;
+  if(s.key==='cust') return sharedCustName||v;
+  const list=CODING[s.data]||[]; const hit=list.find(x=>String(x.code)===String(v));
+  return hit?hit.desc:v;
+}
+function tplPayload(rec){
+  const g=id=>((document.getElementById(id)||{}).value||'').trim();
+  const spans=rec.times.map(hrOf);
+  const p={
+    '測試日期':g('h_date').replace(/-/g,'/'), '預約編號':g('h_book'), '訂單流水號':rec.serial,
+    '完整訂單單號':rec.line.report,
+    '訂單單號OrderNo.':rec.order || String(rec.line.report||'').split('_').slice(0,3).join('_'),
+    '專案名稱':rec.proj, '客戶':sharedCustText.trim(), 'DUT':dutLine(rec),
+    '陪測':rec.line.onsite, '計費':billingOf(rec), '收費':rec.line.charge,
+    '品牌':rec.brand, '連絡人':g('h_contact'), '樣品號ID':rec.line.dutNo,
+    '樣品儲存':rec.storage, 'LabNo.':rec.lab, '測試工程師':rec.eng,
+    'DUT數量':rec.dut, '測試筆數':rec.cnt,
+    'Type':segDesc(rec,SEGS[0]), 'Mode':segDesc(rec,SEGS[1]), '連線方式':segDesc(rec,SEGS[2]),
+    'SPEC版本':segDesc(rec,SEGS[3]), '麥克風':segDesc(rec,SEGS[4]), '測試設備':segDesc(rec,SEGS[5]),
+    '人頭/人工嘴/喇叭':segDesc(rec,SEGS[6]), '測試需求':segDesc(rec,SEGS[7]), '產品別':segDesc(rec,SEGS[9]),
+    '微調進版':rec.sel.ver, '新增/沿用':rec.line.status, '審核人員':rec.line.review,
+    'ERP生成文字':genLine(rec), '產品編號':fullCode(rec),
+    '產品編號_拆解':SEGS.map(s=>segVal(rec,s)||'').join('_'),
+    '樣品圖片':rec.photoUrl||'', '上傳日期':new Date().toISOString().slice(0,10).replace(/-/g,'/')
+  };
+  TIME_LABELS.forEach((lb,i)=>{ const t=rec.times[i];
+    p[lb+'_start']=t.start||'00:00'; p[lb+'_end']=t.end||'00:00'; p[lb+'_span']=spans[i];
+  });
+  return p;
+}
+async function uploadTemplate(){
+  // 先傳圖片（存 Drive 拿連結），再傳資料列
+  for(const r of records){
+    if(r.photo && !r.photoUrl){
+      const res=await fetch(TPL_URL,{method:'POST',body:JSON.stringify({secret:GAS_SECRET,action:'photo',filename:r.photoName||'photo.jpg',data:r.photo})});
+      const j=await res.json(); if(j.ok) r.photoUrl=j.url;
+    }
+  }
+  const res=await fetch(TPL_URL,{method:'POST',body:JSON.stringify({secret:GAS_SECRET,action:'rows',rows:records.map(tplPayload)})});
+  return res.json();
 }
 document.getElementById('uploadBtn').onclick=doUpload;
 
@@ -816,7 +896,7 @@ function saveState(){
     localStorage.setItem(LS_KEY, JSON.stringify({
       v:1, uid,
       header:{ date:g('h_date'), book:g('h_book'), cust:g('h_cust'), contact:g('h_contact') },
-      records
+      records: records.map(r=>Object.assign({},r,{photo:''}))
     }));
   }catch(e){ /* 無痕模式或空間已滿等情況：忽略，不影響使用 */ }
 }
@@ -828,7 +908,7 @@ function normalizeRecord(r){
   if(r.id) b.id=r.id;
   Object.assign(b.sel, r.sel||{});
   b.erpEdited=!!r.erpEdited; b.erp=r.erp||'';
-  ['order','lab','eng','brand','proj','dut','serial'].forEach(k=>{ if(r[k]!=null) b[k]=r[k]; });
+  ['order','lab','eng','brand','proj','dut','serial','storage','cnt','photoName','photoUrl'].forEach(k=>{ if(r[k]!=null) b[k]=r[k]; });
   if(Array.isArray(r.times)) b.times=b.times.map((t,i)=>{ const s=r.times[i]; return s?{start:s.start||'',end:s.end||'',hr:s.hr||'',hrEdited:!!s.hrEdited}:t; });
   Object.assign(b.line, r.line||{});
   if(r.uploaded) b.uploaded=r.uploaded;
