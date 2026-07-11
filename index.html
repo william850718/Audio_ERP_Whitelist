@@ -166,6 +166,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     font-family:var(--mono);font-size:12.5px;line-height:1.6;color:var(--ink);white-space:pre-wrap;word-break:break-word}
   .trow .hr{font-family:var(--mono);text-align:right;font-weight:600}
   .trow .hr.lunch{color:var(--amber)}
+  .trow .hr.neg{border-color:var(--warn);color:var(--warn);background:rgba(229,72,77,.06)}
   .trow .u{font-size:11px;color:var(--muted)}
   .tsum{margin-top:8px;font-size:12px;color:var(--muted)}
   .tsum b{color:var(--ink);font-family:var(--mono)}
@@ -337,13 +338,14 @@ function toMin(t){ if(!t||!/^\d{1,2}:\d{2}$/.test(t)) return null; const [h,m]=t
 function calcHr(start,end){
   const s=toMin(start), e=toMin(end);
   if(s===null||e===null) return {hr:'',lunch:false};
+  const neg = e<s;                  // 結束時間早於開始時間
   let dur=e-s; if(dur<0) dur=0;
   // overlap with lunch window 720..780
   const ov=Math.max(0, Math.min(e,780)-Math.max(s,720));
   dur-=Math.min(60,ov<0?0:ov);
   if(dur<0) dur=0;
   const hr=dur/60;
-  return {hr: Number.isInteger(hr)?String(hr):hr.toFixed(2).replace(/0$/,'').replace(/\.$/,''), lunch: ov>0};
+  return {hr: Number.isInteger(hr)?String(hr):hr.toFixed(2).replace(/0$/,'').replace(/\.$/,''), lunch: ov>0, neg};
 }
 function fmtRange(start,end){
   const a=start&&/^\d{1,2}:\d{2}$/.test(start)?start:'00:00';
@@ -375,7 +377,13 @@ function liveRefresh(rec, i){
   const t=rec.times[i], c=calcHr(t.start,t.end);
   const row=card.querySelectorAll('.trow')[i];
   const hrInput=row && row.querySelector('input.hr');
-  if(hrInput){ hrInput.value = t.hrEdited? t.hr : c.hr; hrInput.classList.toggle('lunch', !t.hrEdited && c.lunch); }
+  if(hrInput){
+    hrInput.value = t.hrEdited? t.hr : c.hr;
+    hrInput.classList.toggle('lunch', !t.hrEdited && c.lunch);
+    hrInput.classList.toggle('neg', !!c.neg);
+    hrInput.title = c.neg ? '結束時間早於開始時間' : '';
+  }
+  if(c.neg && t.start && t.end) toast(`${TIME_LABELS[i]}：結束時間早於開始時間`, true);
   updateTotal(rec);
   updateLinePreview(rec);
   scheduleSave();
@@ -469,7 +477,7 @@ function renderRecord(rec, idx){
       <span class="lbl">${TIME_LABELS[i]}</span>
       ${timeField(rec.id,i,'start',t.start)}
       ${timeField(rec.id,i,'end',t.end)}
-      <input class="hr ${(!t.hrEdited&&c.lunch)?'lunch':''}" data-rid="${rec.id}" data-tidx="${i}" data-tk="hr" value="${shownHr}" placeholder="0" inputmode="decimal">
+      <input class="hr ${(!t.hrEdited&&c.lunch)?'lunch':''} ${c.neg?'neg':''}" ${c.neg?'title="結束時間早於開始時間"':''} data-rid="${rec.id}" data-tidx="${i}" data-tk="hr" value="${shownHr}" placeholder="0" inputmode="decimal">
       <span class="u">hr</span>
     </div>`;
   }).join('');
@@ -606,7 +614,12 @@ function bind(){
     trigger.onclick=(e)=>{ e.stopPropagation(); const wasOpen=!pop.classList.contains('hidden'); closeAllPops(); if(!wasOpen) openPop(trigger,pop,rid,i,k); };
   });
   document.querySelectorAll('[data-rm]').forEach(el=>{
-    el.onclick=()=>{ records=records.filter(r=>String(r.id)!==el.dataset.rm); if(!records.length) records.push(blankRecord()); render(); };
+    el.onclick=()=>{
+      const idx=records.findIndex(r=>String(r.id)===String(el.dataset.rm));
+      if(idx<0) return;
+      if(!confirm(`確定要移除「記錄 ${idx+1}」嗎？此動作無法復原。`)) return;
+      records.splice(idx,1); if(!records.length) records.push(blankRecord()); render();
+    };
   });
   document.querySelectorAll('[data-dl]').forEach(el=>{
     el.onclick=async()=>{ const r=getRec(el.dataset.dl); if(!r) return;
