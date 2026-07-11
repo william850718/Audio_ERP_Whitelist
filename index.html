@@ -211,6 +211,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   <div class="inner">
     <button class="btn add" id="addRec">＋ 新增一筆（最多 3 筆）</button>
     <span class="sub" id="recCount" style="color:var(--muted);font-size:12.5px"></span>
+    <button class="btn" id="uploadBtn">上傳到試算表</button>
     <button class="btn primary" id="exportBtn">匯出白單（每筆一檔）</button>
   </div>
 </div>
@@ -756,6 +757,40 @@ async function doExport(){
   if(n) toast(n>1 ? `已匯出 ${n} 個白單檔` : '已匯出白單');
 }
 document.getElementById('exportBtn').onclick=doExport;
+
+/* ---------- 上傳到 Google 結算試算表（Apps Script Web App） ---------- */
+const GAS_URL='https://script.google.com/macros/s/AKfycbysnLSpe1IYKJOw7VGN5N6l4tbwLH-9tt221duvYsbwAL62-li29FclEA9duVUQl7SlJA/exec';
+const GAS_SECRET='audioWL2026';
+function hrOf(t){ const c=calcHr(t.start,t.end); const v=parseFloat(t.hrEdited?t.hr:c.hr); return isNaN(v)?0:v; }
+function recPayload(rec){
+  const hrs=rec.times.map(hrOf);
+  return {
+    testDate:(document.getElementById('h_date')||{}).value||'',
+    booking:((document.getElementById('h_book')||{}).value||'').trim(),
+    customer:sharedCustText.trim(),
+    engineer:rec.eng, code:fullCode(rec), project:rec.proj, brand:rec.brand,
+    lab:rec.lab, order:rec.order, report:rec.line.report, dut:rec.dut,
+    billing:billingOf(rec), status:rec.line.status,
+    hrA:hrs[0],hrB:hrs[1],hrC:hrs[2],hrD:hrs[3],hrE:hrs[4],hrF:hrs[5],hrG:hrs[6],hrH:hrs[7],
+    hrTotal:Math.round(hrs.reduce((a,b)=>a+b,0)*100)/100
+  };
+}
+async function doUpload(){
+  const btn=document.getElementById('uploadBtn');
+  const incomplete=records.filter(r=>!isComplete(r)).length;
+  let msg=`確定要上傳 ${records.length} 筆記錄到結算試算表嗎？\n（重複按會產生重複列）`;
+  if(incomplete) msg+=`\n注意：有 ${incomplete} 筆產品編號尚未選完。`;
+  if(!confirm(msg)) return;
+  const prev=btn.textContent; btn.disabled=true; btn.textContent='上傳中…';
+  try{
+    const res=await fetch(GAS_URL,{method:'POST',body:JSON.stringify({secret:GAS_SECRET,rows:records.map(recPayload)})});
+    const j=await res.json();
+    if(j.ok) toast(`已上傳 ${j.added} 筆到試算表`);
+    else toast('上傳失敗：'+(j.error||'未知錯誤'),true);
+  }catch(err){ toast('上傳失敗：'+err.message,true); }
+  btn.disabled=false; btn.textContent=prev;
+}
+document.getElementById('uploadBtn').onclick=doUpload;
 
 /* ---------- 本機自動暫存（localStorage：只存在使用者自己的瀏覽器，不會上傳或互通）---------- */
 const LS_KEY='audioWhitelist:v1';
