@@ -800,7 +800,7 @@ document.getElementById('exportBtn').onclick=doExport;
 /* ---------- 上傳到 Google 結算試算表（Apps Script Web App） ---------- */
 const GAS_URL='https://script.google.com/macros/s/AKfycbysnLSpe1IYKJOw7VGN5N6l4tbwLH-9tt221duvYsbwAL62-li29FclEA9duVUQl7SlJA/exec';
 const GAS_SECRET='audioWL2026';
-const TPL_URL='';  // 模板試算表（Audio PAL ERP 編碼原則）的 Web App URL，部署後填入
+const TPL_URL='https://script.google.com/macros/s/AKfycbwmfVNzfqKaCBhuuRQ6cXqWIbgRBCVxDi3TUyH3aK6r0dOl6Q5mpuBsjgWVdVQg6Wg_/exec';
 function hrOf(t){ const c=calcHr(t.start,t.end); const v=parseFloat(t.hrEdited?t.hr:c.hr); return isNaN(v)?0:v; }
 function recPayload(rec){
   const hrs=rec.times.map(hrOf);
