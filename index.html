@@ -815,7 +815,7 @@ async function doUpload(){
       const t=new Date(), hh=`${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
       records.forEach(r=>r.uploaded=hh);
       render();
-      toast(tj.fallback ? '已送出（保底通道），請開試算表確認' : `已上傳 ${tj.added||0} 筆，老闆檢視已同步更新`);
+      toast(tj.fallback ? '已送出（保底通道），請開試算表確認' : `已上傳 ${tj.added||0} 筆，老闆檢視已同步更新`+(tj.verified?'（保底通道確認成功）':''));
     } else toast('上傳失敗：'+((tj&&tj.error)||'未知錯誤'),true);
   }catch(err){ toast('上傳失敗：'+err.message,true); }
   btn.disabled=false; btn.textContent=prev;
@@ -865,14 +865,37 @@ function formPost(url, payloadStr){
     setTimeout(()=>{ f.remove(); res({ok:true, fallback:true}); }, 1500);
   });
 }
+function jsonp(url){
+  // script 標籤載入不受 CORS 限制，用來跟伺服器「對帳」
+  return new Promise((res,rej)=>{
+    const cb='__gascb'+Date.now();
+    const s=document.createElement('script');
+    window[cb]=d=>{ delete window[cb]; s.remove(); res(d); };
+    s.src=url+(url.includes('?')?'&':'?')+'callback='+cb;
+    s.onerror=()=>{ delete window[cb]; s.remove(); rej(new Error('jsonp failed')); };
+    document.body.appendChild(s);
+    setTimeout(()=>{ if(window[cb]){ delete window[cb]; s.remove(); rej(new Error('jsonp timeout')); } }, 8000);
+  });
+}
 async function uploadTemplate(){
   const payload=JSON.stringify({secret:GAS_SECRET,action:'rows',rows:records.map(tplPayload)});
-  try{
-    const res=await fetch(TPL_URL,{method:'POST',body:payload});
-    return await res.json();
-  }catch(err){
-    return formPost(TPL_URL, payload);   // fetch 被 CORS 擋 → 改走表單通道
+  // 標準通道：最多試 2 次
+  for(let i=0;i<2;i++){
+    try{
+      const res=await fetch(TPL_URL,{method:'POST',body:payload});
+      return await res.json();
+    }catch(err){ await new Promise(r=>setTimeout(r,700)); }
   }
+  // 保底通道：表單送出前後各對帳一次，筆數有增加＝確認成功
+  let before=-1;
+  try{ const b=await jsonp(TPL_URL); if(b&&b.ok) before=b.rows; }catch(e){}
+  await formPost(TPL_URL, payload);
+  await new Promise(r=>setTimeout(r,2500));
+  try{
+    const a=await jsonp(TPL_URL);
+    if(a&&a.ok&&before>=0&&a.rows>before) return {ok:true, added:a.rows-before, verified:true};
+  }catch(e){}
+  return {ok:true, fallback:true};
 }
 document.getElementById('uploadBtn').onclick=doUpload;
 
