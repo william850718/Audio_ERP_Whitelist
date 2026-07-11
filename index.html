@@ -799,7 +799,7 @@ document.getElementById('exportBtn').onclick=doExport;
 
 /* ---------- 上傳到模板試算表（Apps Script Web App） ---------- */
 const GAS_SECRET='audioWL2026';
-const TPL_URL='https://script.google.com/macros/s/AKfycbwmfVNzfqKaCBhuuRQ6cXqWIbgRBCVxDi3TUyH3aK6r0dOl6Q5mpuBsjgWVdVQg6Wg_/exec';
+const TPL_URL='https://script.google.com/macros/s/AKfycbw-PZwyMuTyPYLXGx-8cFXqowbCVNJC8iF-FdWNxQouQOkVtB0j4kL_f0awehvGFwdtsw/exec';
 function hrOf(t){ const c=calcHr(t.start,t.end); const v=parseFloat(t.hrEdited?t.hr:c.hr); return isNaN(v)?0:v; }
 async function doUpload(){
   const btn=document.getElementById('uploadBtn');
@@ -815,9 +815,7 @@ async function doUpload(){
       const t=new Date(), hh=`${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
       records.forEach(r=>r.uploaded=hh);
       render();
-      toast(`模板試算表：已新增 ${tj.added||0} 筆`);
-      // 暫時的診斷視窗，確認寫入位置後會移除
-      alert(`上傳成功（診斷資訊）\n試算表：${tj.ssName||'?'}\n分頁：${tj.sheet||'?'}\n表頭列：第 ${tj.headerRow||'?'} 列\n寫入列：第 ${tj.firstWriteRow||'?'} 列`);
+      toast(`已上傳 ${tj.added||0} 筆，老闆檢視已同步更新`);
     } else toast('上傳失敗：'+((tj&&tj.error)||'未知錯誤'),true);
   }catch(err){ toast('上傳失敗：'+err.message,true); }
   btn.disabled=false; btn.textContent=prev;
