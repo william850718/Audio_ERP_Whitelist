@@ -901,7 +901,7 @@ async function doUpload(){
       else seen[key]=true;
     });
     if(records.every(r=>r._skip)){
-      toast(unchanged&&!skipped ? '內容沒有變更，與雲端一致，不需上傳' : '沒有需要上傳的記錄（重複或未變更）');
+      toast(`${skipped+unchanged} 筆已重複上傳，不須更新`);
       return;
     }
   }
@@ -913,7 +913,14 @@ async function doUpload(){
       records.forEach(r=>{ if(!r._skip) r.uploaded=hh; });
       archiveRecords(hh);
       render();
-      toast(tj.fallback ? '已送出，請開試算表確認' : '上傳成功');
+      if(tj.fallback){ toast('已送出，請開試算表確認'); }
+      else{
+        const dup=skipped+unchanged, parts=[];
+        if(tj.added) parts.push(`${tj.added} 筆資料已上傳雲端`);
+        if(tj.updated) parts.push(`${tj.updated} 筆資料已更新雲端`);
+        if(dup) parts.push(`${dup} 筆已重複上傳，不須更新`);
+        toast(parts.join('，')||'上傳成功');
+      }
     } else toast('上傳失敗：'+((tj&&tj.error)||'未知錯誤'),true);
   }catch(err){ toast('上傳失敗：'+err.message,true); }
   btn.disabled=false; btn.textContent=prev;
