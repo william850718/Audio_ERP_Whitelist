@@ -882,26 +882,26 @@ async function doUpload(){
     });
   }
   // 防呆：全新記錄若與「已上傳資料」或「同批其他記錄」身分（日期+預約號+20碼）完全相同 → 自動略過，不會產生重複列
-  let skipped=0, unchanged=0;
+  let skipped=0, unchanged=0; const dupIdx=[];
   {
     const hist=loadHist();
     const seen={};
     records.forEach(r=>{ if(r.uid){ const hd=hdrOf(r); seen[`${hd.date}|${(hd.book||'').trim()}|${fullCode(r)}`]=true; } });
     hist.forEach(h=>{ seen[`${h.date}|${h.book}|${h.code}`]=true; });
-    records.forEach(r=>{
+    records.forEach((r,ri)=>{
       r._skip=false;
       if(r.uid){
         // 上傳後完全沒改過（標記仍是「已上傳」）→ 內容與雲端相同，不用重傳
-        if(r.uploaded){ r._skip=true; unchanged++; }
+        if(r.uploaded){ r._skip=true; unchanged++; dupIdx.push(ri+1); }
         return;
       }
       const hd=hdrOf(r);
       const key=`${hd.date}|${(hd.book||'').trim()}|${fullCode(r)}`;
-      if(seen[key]){ r._skip=true; skipped++; }
+      if(seen[key]){ r._skip=true; skipped++; dupIdx.push(ri+1); }
       else seen[key]=true;
     });
     if(records.every(r=>r._skip)){
-      toast(`${skipped+unchanged} 筆已重複上傳，不須更新`);
+      toast(`記錄 ${dupIdx.join('、')} 已重複上傳，不須更新`);
       return;
     }
   }
@@ -915,10 +915,10 @@ async function doUpload(){
       render();
       if(tj.fallback){ toast('已送出，請開試算表確認'); }
       else{
-        const dup=skipped+unchanged, parts=[];
+        const parts=[];
         if(tj.added) parts.push(`${tj.added} 筆資料已上傳雲端`);
         if(tj.updated) parts.push(`${tj.updated} 筆資料已更新雲端`);
-        if(dup) parts.push(`${dup} 筆已重複上傳，不須更新`);
+        if(dupIdx.length) parts.push(`記錄 ${dupIdx.join('、')} 已重複上傳，不須更新`);
         toast(parts.join('，')||'上傳成功');
       }
     } else toast('上傳失敗：'+((tj&&tj.error)||'未知錯誤'),true);
