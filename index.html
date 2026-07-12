@@ -171,6 +171,18 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   .upbadge.ok{background:#e7f6ec;color:#1a7f37;border-color:#c6e8d2}
   .photonote{font-size:11.5px;color:#1a7f37;margin-left:6px}
   textarea[data-erp]{min-height:230px;line-height:1.55}
+  .rec-head .ghostbtn{border:1px solid var(--line);background:#fff;color:var(--muted);border-radius:8px;padding:6px 12px;font-size:12.5px;cursor:pointer;margin-right:8px}
+  .rec-head .ghostbtn:hover{border-color:var(--accent);color:var(--accent)}
+  .hist-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:60;display:flex;align-items:center;justify-content:center;padding:20px}
+  .hist-overlay.hidden{display:none}
+  .hist-panel{background:#fff;border-radius:14px;max-width:920px;width:100%;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+  .hist-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--line2)}
+  .hist-list{overflow:auto;padding:8px 18px 16px}
+  .hist-row{display:grid;grid-template-columns:92px 104px 1fr 110px 76px auto;gap:10px;align-items:center;padding:9px 6px;border-bottom:1px solid var(--line2);font-size:13px}
+  .hist-row .hbtn{border:1px solid var(--line);background:#fff;border-radius:7px;padding:4px 10px;font-size:12px;cursor:pointer;margin-left:6px}
+  .hist-row .hbtn:hover{border-color:var(--accent);color:var(--accent)}
+  .hist-row .hbtn.danger:hover{border-color:var(--warn);color:var(--warn)}
+  .hist-empty{color:var(--muted);padding:24px;text-align:center}
   .trow .u{font-size:11px;color:var(--muted)}
   .tsum{margin-top:8px;font-size:12px;color:var(--muted)}
   .tsum b{color:var(--ink);font-family:var(--mono)}
@@ -198,6 +210,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     <h1>Audio PAL ERP 編碼原則_Audio Team</h1>
     <span class="sub">產品編號自動拼碼 · ERP 描述自動生成 · 工時自動計算 · 一鍵匯出官方白單</span>
     <span class="tag">編碼原則 第19版</span>
+    <button class="btn" id="histBtn" style="margin-left:auto">歷史紀錄</button>
   </div>
 
   <!-- shared header -->
@@ -221,6 +234,13 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 </div>
 
 <div class="toast" id="toast"></div>
+
+<div class="hist-overlay hidden" id="histOverlay">
+  <div class="hist-panel">
+    <div class="hist-head"><b>歷史紀錄（此瀏覽器上傳過的記錄）</b><button class="btn" id="histClose">關閉</button></div>
+    <div class="hist-list" id="histList"></div>
+  </div>
+</div>
 
 <script id="coding-data" type="application/json">{"TYPE": [{"code": "N", "desc": "NVH"}, {"code": "U", "desc": "Audio"}, {"code": "V", "desc": "Video"}, {"code": "R", "desc": "Speech"}, {"code": "I", "desc": "Chamber Built"}, {"code": "C", "desc": "Integrity"}], "MODE": [{"code": "TS", "desc": "Teams Audio", "brand": "Microsoft"}, {"code": "TF", "desc": "Teams Function", "brand": "Microsoft"}, {"code": "CT", "desc": "Cortana", "brand": "Microsoft"}, {"code": "MS", "desc": "MOS (Mean Opinion Score)", "brand": "Microsoft"}, {"code": "RT", "desc": "RTC (Real Time Communication)", "brand": "Microsoft"}, {"code": "EE", "desc": "E2E", "brand": "Microsoft"}, {"code": "TA", "desc": "TAS", "brand": "Microsoft"}, {"code": "ZM", "desc": "Zoom Audio", "brand": "Zoom"}, {"code": "ZA", "desc": "Zoom AIO", "brand": "Zoom"}, {"code": "ZF", "desc": "Zoom Function", "brand": "Zoom"}, {"code": "ZC", "desc": "Zoom Controller", "brand": "Zoom"}, {"code": "ZP", "desc": "Zoom Scheduler", "brand": "Zoom"}, {"code": "EE", "desc": "E2E", "brand": "Zoom"}, {"code": "CA", "desc": "Chromebook Audio", "brand": "Google"}, {"code": "CS", "desc": "Chromebook Stylus", "brand": "Google"}, {"code": "GC", "desc": "Google CFM", "brand": "Google"}, {"code": "GF", "desc": "Google CFM Function", "brand": "Google"}, {"code": "TO", "desc": "Chromebook Touch", "brand": "Google"}, {"code": "LQ", "desc": "Lenovo Speech Quality", "brand": "Lenovo"}, {"code": "LS", "desc": "Lenovo Speaker Performance", "brand": "Lenovo"}, {"code": "DN", "desc": "DNN", "brand": "Lenovo"}, {"code": "DV", "desc": "Dell VOIP", "brand": "DELL"}, {"code": "CP", "desc": "Carplay", "brand": "Apple"}, {"code": "DX", "desc": "DXO", "brand": "DXO"}, {"code": "E1", "desc": "EN50332-1", "brand": "ISO"}, {"code": "E2", "desc": "EN50332-2", "brand": "ISO"}, {"code": "SC", "desc": "Test with Soundcheck", "brand": "Basic performance"}, {"code": "AP", "desc": "Test with AP", "brand": "Basic performance"}, {"code": "SC", "desc": "Special Case", "brand": "Other"}, {"code": "SP", "desc": "SPET", "brand": "Intel"}, {"code": "BA", "desc": "BT Audio", "brand": "Intel"}], "CONN": [{"code": "0", "desc": "No Wired"}, {"code": "1", "desc": "USB Wired"}, {"code": "2", "desc": "Wireless with USB Dongle"}, {"code": "3", "desc": "Bluetooh"}, {"code": "4", "desc": "POE (Power over Ethernet)"}], "SPEC": [{"code": "000", "desc": "No Edition"}, {"code": "040", "desc": "Teams V4"}, {"code": "050", "desc": "Teams V5"}, {"code": "101", "desc": "Cortana V10.1"}, {"code": "018", "desc": "RTC1.8"}, {"code": "019", "desc": "RTC1.9"}, {"code": "010", "desc": "TalkAnalysisSuite_Guide_v1.0"}, {"code": "300", "desc": "No Edition"}, {"code": "325", "desc": "Zoom Rooms Audio V2.5"}, {"code": "323", "desc": "Zoom AIO V2.3 (Include FW-Test)"}, {"code": "425", "desc": "Zoom AIO V2.5 (Include FW-Test)"}, {"code": "340", "desc": "Zoom FW-TEST Android V4.0 (Only)"}, {"code": "342", "desc": "Zoom FW-TEST Android V4.2 (Only)"}, {"code": "320", "desc": "Zoom FW-TEST Window V2.0(Only)"}, {"code": "324", "desc": "Zoom FW-TEST Window V2.4(Only)"}, {"code": "330", "desc": "ZR Controller (ZRC) V3.0"}, {"code": "331", "desc": "ZR Scheduler (ZRP) V3.1"}, {"code": "310", "desc": "Digital Signage_V 1.0"}, {"code": "500", "desc": "No Edition"}, {"code": "520", "desc": "Stylus_Design_Verification _v2.0_ChromeOS"}, {"code": "513", "desc": "Finger Touch Design Verification Document"}, {"code": "517", "desc": "Audio System Qualification v1.7"}, {"code": "036", "desc": "Lenovo_Thermal_ and Acoustic_Spec V3.6.9"}, {"code": "037", "desc": "Lenovo_Thermal_ and Acoustic_Spec V3.7.3"}, {"code": "015", "desc": "DNN V1.5"}, {"code": "000", "desc": "No Edition"}, {"code": "008", "desc": "HAE-car_HAE-BGN_Rev8"}, {"code": "000", "desc": "No Edition"}, {"code": "013", "desc": "EN50332 (2013)"}, {"code": "000", "desc": "No Edition"}, {"code": "000", "desc": "No Edition"}, {"code": "113", "desc": "Speech Platform Evaluation Toolset_V1.13"}], "MIC": [{"code": "N", "desc": "No Mic."}, {"code": "A", "desc": "46AC"}, {"code": "B", "desc": "46AE"}, {"code": "C", "desc": "46AF"}, {"code": "D", "desc": "26AK"}, {"code": "E", "desc": "46BP"}, {"code": "F", "desc": "2690+40AN"}, {"code": "G", "desc": "40AE(26CA)"}, {"code": "H", "desc": "40AE(26CA) +46BP"}, {"code": "I", "desc": "M30"}], "EQUIP": [{"code": "00", "desc": "Human"}, {"code": "01", "desc": "Labcore +BGN/3PASS"}, {"code": "02", "desc": "AP (Audio Precision)"}, {"code": "03", "desc": "Listen Amp connect 621"}, {"code": "04", "desc": "BGN (Background Noise)"}, {"code": "05", "desc": "3PASS"}, {"code": "06", "desc": "PC+Soundcard"}, {"code": "07", "desc": "Touch Robot"}, {"code": "08", "desc": "Stylus Robot"}, {"code": "09", "desc": "Listen Amp connect ISC"}, {"code": "10", "desc": "RF Shielded Box"}], "HEAD": [{"code": "0", "desc": "None"}, {"code": "1", "desc": "HMSII.3"}, {"code": "2", "desc": "BK 4128C"}, {"code": "3", "desc": "GRAS 44AA"}, {"code": "4", "desc": "HMSII.3 + GRAS 44AA"}, {"code": "5", "desc": "BK 4128C + GRAS 44AA"}, {"code": "6", "desc": "Min12"}, {"code": "7", "desc": "8351B"}, {"code": "8", "desc": "8331A"}], "REQ": [{"code": "DB", "desc": "Debug"}, {"code": "QA", "desc": "Qualification"}, {"code": "RQ", "desc": "Re-Qualification"}, {"code": "PT", "desc": "Pre-Test"}, {"code": "SO", "desc": "Special Offer"}, {"code": "FS", "desc": "Free Support"}, {"code": "LF", "desc": "Lenovo Full Round 1"}, {"code": "LS", "desc": "Lenovo Full Round 2"}, {"code": "LT", "desc": "Pre-Test"}], "PROD": [{"code": "2W", "desc": "2 Wheels"}, {"code": "4W", "desc": "4 Wheels"}, {"code": "AM", "desc": "A-Mic"}, {"code": "AO", "desc": "AIO"}, {"code": "BH", "desc": "NBT Headset (Native Bluetooth)"}, {"code": "BS", "desc": "NBT Speakerphone"}, {"code": "CB", "desc": "Chromebook"}, {"code": "CC", "desc": "Conferencing Camera"}, {"code": "CD", "desc": "Collaboration Display"}, {"code": "CS", "desc": "Conferencing Speakerphones"}, {"code": "CX", "desc": "Chromebox"}, {"code": "DM", "desc": "D-Mic"}, {"code": "DP", "desc": "DSP System (Digital Signal Processing)"}, {"code": "DT", "desc": "Desktop"}, {"code": "HS", "desc": "Handsets"}, {"code": "IS", "desc": "Intelligent Speaker"}, {"code": "MD", "desc": "Mobile Phone Dock"}, {"code": "NB", "desc": "Notebook"}, {"code": "OH", "desc": "Open Office Headset"}, {"code": "PM", "desc": "Personal Monitor"}, {"code": "PS", "desc": "Personal Speakerphone"}, {"code": "SB", "desc": "Soundbar"}, {"code": "SK", "desc": "Speaker"}, {"code": "ST", "desc": "Stylus"}, {"code": "TA", "desc": "Teams Rooms on Android"}, {"code": "TB", "desc": "Tablet"}, {"code": "TV", "desc": "Big Screen TV"}, {"code": "TW", "desc": "Teams Rooms on Windows"}, {"code": "UC", "desc": "USB Camera"}, {"code": "UD", "desc": "USB Desk Phones"}, {"code": "UH", "desc": "USB Headset"}, {"code": "AD", "desc": "Android Desk phone"}, {"code": "CR", "desc": "Controller"}, {"code": "SR", "desc": "Scheduler"}, {"code": "HI", "desc": "Handheld Item"}]}</script>
 <script id="tpl-data" type="text/plain">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</script>
@@ -500,9 +520,8 @@ function renderRecord(rec, idx){
       <span class="rec-no">${idx+1}</span>
       <span class="ttl">記錄 ${idx+1}</span>
       ${rec.uploaded?`<span class="upbadge ok">已上傳 ${rec.uploaded}</span>`:`<span class="upbadge">未上傳</span>`}
-      <button class="dlbtn" data-dup="${rec.id}">複製此筆</button>
       <button class="dlbtn" data-dl="${rec.id}" data-idx="${idx}">下載此筆白單</button>
-      ${rec.uid?`<button class="rm" data-cdel="${rec.id}">刪除雲端資料</button>`:''}
+      <button class="ghostbtn" data-dup="${rec.id}" title="以此筆內容建立新記錄（視為另一筆測試）">複製此筆</button>
       <button class="rm" data-rm="${rec.id}">移除</button>
     </div>
     <div class="rec-body">
@@ -708,21 +727,9 @@ function bind(){
       c.id=++uid; c.uid=''; c.uploaded='';   // 新卡片：識別碼歸零，上傳時視為全新資料
       const i=records.findIndex(x=>x.id===r.id);
       records.splice(i+1,0,c); render();
+      const card=document.querySelector(`.rec[data-rid="${c.id}"]`);
+      if(card) card.scrollIntoView({behavior:'smooth'});
       toast('已複製為新的一筆（修改日期/預約編號後再上傳）');
-    };
-  });
-  document.querySelectorAll('[data-cdel]').forEach(el=>{
-    el.onclick=async()=>{ const r=getRec(el.dataset.cdel); if(!r||!r.uid) return;
-      if(!confirm('確定要刪除「雲端試算表」上的這筆資料嗎？\n（本機的填寫內容會保留，可修改後重新上傳）')) return;
-      el.disabled=true; el.textContent='刪除中…';
-      const payload=JSON.stringify({secret:GAS_SECRET,action:'delete',uids:[r.uid]});
-      try{
-        let ok=false;
-        try{ const res=await fetch(TPL_URL,{method:'POST',body:payload}); const j=await res.json(); ok=j&&j.ok; }
-        catch(e){ await formPost(TPL_URL,payload); ok=true; }
-        if(ok){ r.uid=''; r.uploaded=''; render(); toast('已刪除雲端資料'); scheduleSave(); }
-        else toast('刪除失敗',true);
-      }finally{ if(document.body.contains(el)){ el.disabled=false; el.textContent='刪除雲端資料'; } }
     };
   });
   document.querySelectorAll('[data-copyline]').forEach(el=>{
@@ -850,6 +857,7 @@ async function doUpload(){
     if(tj&&tj.ok){
       const t=new Date(), hh=`${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
       records.forEach(r=>r.uploaded=hh);
+      archiveRecords(hh);
       render();
       toast(tj.fallback ? '已送出，請開試算表確認' : `上傳成功（新增 ${tj.added||0} 筆、更新 ${tj.updated||0} 筆）`);
     } else toast('上傳失敗：'+((tj&&tj.error)||'未知錯誤'),true);
@@ -936,6 +944,82 @@ async function uploadTemplate(){
   return {ok:true, fallback:true};
 }
 document.getElementById('uploadBtn').onclick=doUpload;
+
+/* ---------- 歷史紀錄（此瀏覽器上傳過的記錄，可載入修改或刪除雲端資料）---------- */
+const HIST_KEY='audioWhitelist:hist';
+function loadHist(){ try{ return JSON.parse(localStorage.getItem(HIST_KEY)||'[]'); }catch(e){ return []; } }
+function saveHist(l){ try{ localStorage.setItem(HIST_KEY, JSON.stringify(l.slice(0,100))); }catch(e){} }
+function archiveRecords(hh){
+  const g=id=>(document.getElementById(id)||{}).value||'';
+  let hist=loadHist();
+  records.forEach(r=>{
+    if(!r.uid) return;
+    const snap=JSON.parse(JSON.stringify(r)); snap.photo='';
+    const entry={uid:r.uid, at:Date.now(), date:g('h_date'), book:g('h_book'),
+      code:fullCode(r), eng:r.eng, upAt:hh,
+      header:{date:g('h_date'),book:g('h_book'),cust:g('h_cust'),contact:g('h_contact')}, rec:snap};
+    const i=hist.findIndex(x=>x.uid===r.uid);
+    if(i>=0) hist[i]=entry; else hist.unshift(entry);
+  });
+  hist.sort((a,b)=>b.at-a.at);
+  saveHist(hist);
+}
+async function cloudDelete(uidStr){
+  const payload=JSON.stringify({secret:GAS_SECRET,action:'delete',uids:[uidStr]});
+  try{ const res=await fetch(TPL_URL,{method:'POST',body:payload}); const j=await res.json(); return !!(j&&j.ok); }
+  catch(e){ await formPost(TPL_URL,payload); return true; }
+}
+function renderHist(){
+  const list=document.getElementById('histList');
+  const hist=loadHist();
+  if(!hist.length){ list.innerHTML='<div class="hist-empty">還沒有上傳過的記錄</div>'; return; }
+  list.innerHTML=hist.map((h,i)=>`<div class="hist-row">
+    <span>${esc(h.date)}</span><span>${esc(h.book)}</span>
+    <span style="font-family:ui-monospace,monospace">${esc(h.code)}</span>
+    <span>${esc(h.eng)}</span><span style="color:var(--muted)">${esc(h.upAt||'')}</span>
+    <span>
+      <button class="hbtn" data-hload="${i}">載入修改</button>
+      <button class="hbtn danger" data-hdel="${i}">刪除雲端</button>
+    </span>
+  </div>`).join('');
+  list.querySelectorAll('[data-hload]').forEach(b=>{ b.onclick=()=>histLoad(+b.dataset.hload); });
+  list.querySelectorAll('[data-hdel]').forEach(b=>{ b.onclick=()=>histDel(+b.dataset.hdel); });
+}
+function histLoad(i){
+  const h=loadHist()[i]; if(!h) return;
+  document.getElementById('histOverlay').classList.add('hidden');
+  const live=records.find(r=>r.uid===h.uid);
+  if(live){
+    const card=document.querySelector(`.rec[data-rid="${live.id}"]`);
+    if(card) card.scrollIntoView({behavior:'smooth'});
+    toast('這筆已在下方卡片中，直接修改後重新上傳即可');
+    return;
+  }
+  if(records.length>=3){ toast('目前已有 3 筆，請先移除一筆再載入',true); return; }
+  if(!confirm('載入會套用該筆的表頭（測試日期/預約編號/客戶/連絡人），繼續？')) return;
+  const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=v||''; };
+  set('h_date',h.header.date); set('h_book',h.header.book); set('h_cust',h.header.cust); set('h_contact',h.header.contact);
+  sharedCustText=h.header.cust||''; sharedCust=extractCust(sharedCustText); sharedCustName=custNameFromText(sharedCustText);
+  const rec=normalizeRecord(h.rec); rec.id=++uid; rec.uid=h.uid; rec.uploaded=h.upAt||'已上傳';
+  records.push(rec); render();
+  const card=document.querySelector(`.rec[data-rid="${rec.id}"]`);
+  if(card) card.scrollIntoView({behavior:'smooth'});
+  toast('已載入，修改後按「上傳」即可更新原資料');
+}
+async function histDel(i){
+  const hist=loadHist(); const h=hist[i]; if(!h) return;
+  if(!confirm(`確定刪除雲端上的這筆資料？\n${h.date} / ${h.book}\n${h.code}`)) return;
+  const ok=await cloudDelete(h.uid);
+  if(ok){
+    hist.splice(i,1); saveHist(hist); renderHist();
+    const live=records.find(r=>r.uid===h.uid);
+    if(live){ live.uid=''; live.uploaded=''; render(); }
+    toast('已刪除雲端資料');
+  } else toast('刪除失敗',true);
+}
+document.getElementById('histBtn').onclick=()=>{ renderHist(); document.getElementById('histOverlay').classList.remove('hidden'); };
+document.getElementById('histClose').onclick=()=>document.getElementById('histOverlay').classList.add('hidden');
+document.getElementById('histOverlay').onclick=(e)=>{ if(e.target.id==='histOverlay') e.target.classList.add('hidden'); };
 
 /* ---------- 本機自動暫存（localStorage：只存在使用者自己的瀏覽器，不會上傳或互通）---------- */
 const LS_KEY='audioWhitelist:v1';
