@@ -871,7 +871,8 @@ async function doUpload(){
       }
     });
   }
-  // 防呆：全新記錄若與「已上傳資料」或「同批其他記錄」身分完全相同，攔下詢問（避免誤複製造成重複列）
+  // 防呆：全新記錄若與「已上傳資料」或「同批其他記錄」身分（日期+預約號+20碼）完全相同 → 自動略過，不會產生重複列
+  let skipped=0;
   {
     const hist=loadHist();
     const seen={};
@@ -882,12 +883,10 @@ async function doUpload(){
       if(r.uid) return;
       const hd=hdrOf(r);
       const key=`${hd.date}|${(hd.book||'').trim()}|${fullCode(r)}`;
-      if(seen[key]){
-        const go=confirm(`這筆與已上傳的資料「身分完全相同」：\n${hd.date}／${(hd.book||'').trim()}\n${fullCode(r)}\n\n【確定】＝仍要上傳（真的有兩筆相同的測試）\n【取消】＝略過這筆，不上傳`);
-        if(!go) r._skip=true;
-      } else seen[key]=true;
+      if(seen[key]){ r._skip=true; skipped++; }
+      else seen[key]=true;
     });
-    if(records.every(r=>r._skip)){ toast('沒有要上傳的記錄'); return; }
+    if(records.every(r=>r._skip)){ toast('所有記錄都與雲端資料相同，不需上傳'); return; }
   }
   const prev=btn.textContent; btn.disabled=true; btn.textContent='上傳中…';
   try{
@@ -897,7 +896,7 @@ async function doUpload(){
       records.forEach(r=>{ if(!r._skip) r.uploaded=hh; });
       archiveRecords(hh);
       render();
-      toast(tj.fallback ? '已送出，請開試算表確認' : `上傳成功（新增 ${tj.added||0} 筆、更新 ${tj.updated||0} 筆）`);
+      toast(tj.fallback ? '已送出，請開試算表確認' : `上傳成功（新增 ${tj.added||0} 筆、更新 ${tj.updated||0} 筆${skipped?`、略過 ${skipped} 筆重複`:''}）`);
     } else toast('上傳失敗：'+((tj&&tj.error)||'未知錯誤'),true);
   }catch(err){ toast('上傳失敗：'+err.message,true); }
   btn.disabled=false; btn.textContent=prev;
