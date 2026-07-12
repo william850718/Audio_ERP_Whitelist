@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Audio 白單填寫助手</title>
+<title>Audio PAL ERP 編碼原則_Audio Team</title>
 <script>/* ExcelJS (inlined for offline use) */
 /*! ExcelJS 19-10-2023 */
 
@@ -195,7 +195,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 <body>
 <div class="wrap">
   <div class="topbar">
-    <h1>Audio 白單填寫助手</h1>
+    <h1>Audio PAL ERP 編碼原則_Audio Team</h1>
     <span class="sub">產品編號自動拼碼 · ERP 描述自動生成 · 工時自動計算 · 一鍵匯出官方白單</span>
     <span class="tag">編碼原則 第19版</span>
   </div>
@@ -260,7 +260,7 @@ function blankRecord(){
     id:++uid,
     sel:{type:'U',mode:'',conn:'',spec:'',mic:'',equip:'',head:'',req:'',prod:'',ver:'1'},
     erpEdited:false, erp:'',
-    order:'', lab:'', eng:'', brand:'', proj:'', dut:'', serial:'', storage:'',
+    lab:'', eng:'', brand:'', proj:'', dut:'', serial:'', storage:'',
     photo:'', photoName:'', photoUrl:'',
     times: TIME_LABELS.map(()=>({start:'',end:'',hr:'',hrEdited:false})),
     line:{ report:'', dutSrc:'客戶自帶', dutNo:'', billing:'auto', onsite:'', charge:'知道', review:'', status:'新增' },
@@ -290,6 +290,8 @@ function testTimeLine(rec){
   return `${t.start} - ${t.end} ${hr}hr`;
 }
 function dutLine(rec){ return rec.line.dutSrc==='貝爾倉庫' ? rec.line.dutNo : '客戶自帶'; }
+/* 訂單單號 Order No.：從報告號自動解析（取開頭 XXX_XX_XXXX 段） */
+function orderNoOf(rec){ const m=String(rec.line.report||'').trim().match(/^[A-Za-z0-9]+_[0-9]+_[0-9]+/); return m?m[0]:''; }
 function genLine(rec){
   const dateStr=(document.getElementById('h_date')||{}).value||'';
   let dd=''; if(dateStr){ const p=dateStr.split('-'); dd=`${p[1]}/${p[2]}`; }
@@ -526,7 +528,6 @@ function renderRecord(rec, idx){
         <div>
           <p class="sect-t">訂單與測試資訊</p>
           <div class="inforows">
-            <div class="fld full"><label>訂單單號 Order No. <span class="opt">(*選填)</span></label><input data-rid="${rec.id}" data-f="order" value="${esc(rec.order)}"></div>
             <div class="fld"><label>Lab No.</label><input data-rid="${rec.id}" data-f="lab" value="${esc(rec.lab)}" placeholder="A7"></div>
             <div class="fld"><label>DUT 數量</label><input data-rid="${rec.id}" data-f="dut" value="${esc(rec.dut)}" inputmode="numeric"></div>
             <div class="fld full"><label>測試工程師</label><input data-rid="${rec.id}" data-f="eng" value="${esc(rec.eng)}"></div>
@@ -737,7 +738,7 @@ function writeBlock(ws,bs,rec){
     for(let i=0;i<s.w;i++){ const ch=chars[i]; if(ch) setCell(ws, colL(5+col+i)+(bs+1), ch); }
     col+=s.w;
   });
-  setCell(ws,'B'+(bs+2),rec.order);
+  setCell(ws,'B'+(bs+2),orderNoOf(rec));
   setCell(ws,'E'+(bs+2),rec.lab);
   setCell(ws,'E'+(bs+3),rec.eng);
   setCell(ws,'E'+(bs+4),rec.brand);
@@ -834,7 +835,7 @@ function tplPayload(rec){
   const p={
     '測試日期':g('h_date').replace(/-/g,'/'), '預約編號':g('h_book'), '訂單流水號':rec.serial,
     '完整訂單單號':rec.line.report,
-    '訂單單號OrderNo.':rec.order || String(rec.line.report||'').split('_').slice(0,3).join('_'),
+    '訂單單號OrderNo.':orderNoOf(rec),
     '專案名稱':rec.proj, '客戶':sharedCustText.trim(), 'DUT':dutLine(rec),
     '陪測':rec.line.onsite, '計費':billingOf(rec), '收費':rec.line.charge,
     '品牌':rec.brand, '連絡人':g('h_contact'), '樣品號ID':rec.line.dutNo,
@@ -920,7 +921,7 @@ function normalizeRecord(r){
   if(r.id) b.id=r.id;
   Object.assign(b.sel, r.sel||{});
   b.erpEdited=!!r.erpEdited; b.erp=r.erp||'';
-  ['order','lab','eng','brand','proj','dut','serial','storage','photoName','photoUrl'].forEach(k=>{ if(r[k]!=null) b[k]=r[k]; });
+  ['lab','eng','brand','proj','dut','serial','storage','photoName','photoUrl'].forEach(k=>{ if(r[k]!=null) b[k]=r[k]; });
   if(Array.isArray(r.times)) b.times=b.times.map((t,i)=>{ const s=r.times[i]; return s?{start:s.start||'',end:s.end||'',hr:s.hr||'',hrEdited:!!s.hrEdited}:t; });
   Object.assign(b.line, r.line||{});
   if(r.uploaded) b.uploaded=r.uploaded;
