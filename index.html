@@ -869,8 +869,12 @@ async function doUpload(){
       const h=hist.find(x=>x.uid===r.uid); if(!h) return;
       const codeNow=fullCode(r), hd=hdrOf(r);
       const dateChg=h.date!==(hd.date||''), bookChg=h.book!==(hd.book||'').trim(), codeChg=h.code!==codeNow;
-      if(dateChg || bookChg){
-        const asNew=confirm(`此筆之前上傳過：\n上次：${h.date}／${h.book}\n　　　${h.code}\n這次：${hd.date}／${(hd.book||'').trim()}\n　　　${codeNow}\n\n測試日期／預約編號變了——這是「另一筆新測試」嗎？\n\n【確定】＝當成新紀錄上傳（雲端原紀錄保留）\n【取消】＝我在修正原紀錄（更新雲端原列）`);
+      if(dateChg && bookChg){
+        r.uid=genUid(); r.uploaded=''; autoNew++;   // 日期+預約號都變 → 必為另一場測試
+      } else if(dateChg || bookChg){
+        // 只變其中一個 → 可能是修正打錯的欄位，詢問
+        const what=dateChg?'測試日期':'預約編號';
+        const asNew=confirm(`此筆之前上傳過：\n上次：${h.date}／${h.book}\n這次：${hd.date}／${(hd.book||'').trim()}\n\n只有「${what}」變了——這是「另一筆新測試」嗎？\n\n【確定】＝當成新紀錄上傳（雲端原紀錄保留）\n【取消】＝我在修正原紀錄（更新雲端原列）`);
         if(asNew){ r.uid=genUid(); r.uploaded=''; }
       } else if(codeChg){
         r.uid=genUid(); r.uploaded=''; autoNew++;   // 同日同預約號、20碼不同 → 另一筆測試
@@ -909,7 +913,7 @@ async function doUpload(){
       records.forEach(r=>{ if(!r._skip) r.uploaded=hh; });
       archiveRecords(hh);
       render();
-      const extra=(skipped?`、略過 ${skipped} 筆重複`:'')+(unchanged?`、${unchanged} 筆未變更`:'')+(autoNew?`、${autoNew} 筆因 20 碼不同視為新測試`:'');
+      const extra=(skipped?`、略過 ${skipped} 筆重複`:'')+(unchanged?`、${unchanged} 筆未變更`:'')+(autoNew?`、${autoNew} 筆自動視為新測試`:'');
       toast(tj.fallback ? '已送出，請開試算表確認' : `上傳成功（新增 ${tj.added||0} 筆、更新 ${tj.updated||0} 筆${extra}）`);
     } else toast('上傳失敗：'+((tj&&tj.error)||'未知錯誤'),true);
   }catch(err){ toast('上傳失敗：'+err.message,true); }
