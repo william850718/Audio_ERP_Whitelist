@@ -913,8 +913,7 @@ async function doUpload(){
       records.forEach(r=>{ if(!r._skip) r.uploaded=hh; });
       archiveRecords(hh);
       render();
-      const extra=(skipped?`、略過 ${skipped} 筆重複`:'')+(unchanged?`、${unchanged} 筆未變更`:'')+(autoNew?`、${autoNew} 筆自動視為新測試`:'');
-      toast(tj.fallback ? '已送出，請開試算表確認' : `上傳成功（新增 ${tj.added||0} 筆、更新 ${tj.updated||0} 筆${extra}）`);
+      toast(tj.fallback ? '已送出，請開試算表確認' : '上傳成功');
     } else toast('上傳失敗：'+((tj&&tj.error)||'未知錯誤'),true);
   }catch(err){ toast('上傳失敗：'+err.message,true); }
   btn.disabled=false; btn.textContent=prev;
