@@ -858,8 +858,9 @@ async function doUpload(){
     records.forEach(r=>{
       if(!r.uid) return;
       const h=hist.find(x=>x.uid===r.uid); if(!h) return;
-      if(h.date!==g('h_date') || h.book!==g('h_book')){
-        const asNew=confirm(`此筆（${fullCode(r)}）之前上傳過：\n上次：${h.date}／${h.book}\n這次：${g('h_date')}／${g('h_book')}\n\n測試日期或預約編號變了——這是「另一筆新測試」嗎？\n\n【確定】＝當成新紀錄上傳（雲端原紀錄保留）\n【取消】＝我在修正原紀錄（更新雲端原列）`);
+      const codeNow=fullCode(r);
+      if(h.date!==g('h_date') || h.book!==g('h_book') || h.code!==codeNow){
+        const asNew=confirm(`此筆之前上傳過：\n上次：${h.date}／${h.book}\n　　　${h.code}\n這次：${g('h_date')}／${g('h_book')}\n　　　${codeNow}\n\n測試日期／預約編號／產品編號變了——這是「另一筆新測試」嗎？\n\n【確定】＝當成新紀錄上傳（雲端原紀錄保留）\n【取消】＝我在修正原紀錄（更新雲端原列）`);
         if(asNew){ r.uid=genUid(); r.uploaded=''; }
       }
     });
