@@ -858,16 +858,22 @@ async function doUpload(){
   if(!TPL_URL){ toast('尚未設定模板試算表網址',true); return; }
   const incomplete=records.filter(r=>!isComplete(r)).length;
   if(incomplete && !confirm(`有 ${incomplete} 筆的產品編號尚未選完，仍要上傳嗎？`)) return;
-  // 防呆：上傳過的記錄若「測試日期/預約編號/20碼」變了，可能是另一筆新測試
+  // 防呆：上傳過的記錄身分變更判定
+  //   只有 20 碼變（同日同預約號）→ 明顯是另一筆測試（如不同連線模式）→ 自動視為新紀錄
+  //   日期或預約號變了 → 詢問是新測試還是修正
+  let autoNew=0;
   {
     const hist=loadHist();
     records.forEach(r=>{
       if(!r.uid) return;
       const h=hist.find(x=>x.uid===r.uid); if(!h) return;
       const codeNow=fullCode(r), hd=hdrOf(r);
-      if(h.date!==(hd.date||'') || h.book!==(hd.book||'').trim() || h.code!==codeNow){
-        const asNew=confirm(`此筆之前上傳過：\n上次：${h.date}／${h.book}\n　　　${h.code}\n這次：${hd.date}／${(hd.book||'').trim()}\n　　　${codeNow}\n\n測試日期／預約編號／產品編號變了——這是「另一筆新測試」嗎？\n\n【確定】＝當成新紀錄上傳（雲端原紀錄保留）\n【取消】＝我在修正原紀錄（更新雲端原列）`);
+      const dateChg=h.date!==(hd.date||''), bookChg=h.book!==(hd.book||'').trim(), codeChg=h.code!==codeNow;
+      if(dateChg || bookChg){
+        const asNew=confirm(`此筆之前上傳過：\n上次：${h.date}／${h.book}\n　　　${h.code}\n這次：${hd.date}／${(hd.book||'').trim()}\n　　　${codeNow}\n\n測試日期／預約編號變了——這是「另一筆新測試」嗎？\n\n【確定】＝當成新紀錄上傳（雲端原紀錄保留）\n【取消】＝我在修正原紀錄（更新雲端原列）`);
         if(asNew){ r.uid=genUid(); r.uploaded=''; }
+      } else if(codeChg){
+        r.uid=genUid(); r.uploaded=''; autoNew++;   // 同日同預約號、20碼不同 → 另一筆測試
       }
     });
   }
@@ -903,7 +909,7 @@ async function doUpload(){
       records.forEach(r=>{ if(!r._skip) r.uploaded=hh; });
       archiveRecords(hh);
       render();
-      const extra=(skipped?`、略過 ${skipped} 筆重複`:'')+(unchanged?`、${unchanged} 筆未變更`:'');
+      const extra=(skipped?`、略過 ${skipped} 筆重複`:'')+(unchanged?`、${unchanged} 筆未變更`:'')+(autoNew?`、${autoNew} 筆因 20 碼不同視為新測試`:'');
       toast(tj.fallback ? '已送出，請開試算表確認' : `上傳成功（新增 ${tj.added||0} 筆、更新 ${tj.updated||0} 筆${extra}）`);
     } else toast('上傳失敗：'+((tj&&tj.error)||'未知錯誤'),true);
   }catch(err){ toast('上傳失敗：'+err.message,true); }
