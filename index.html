@@ -170,6 +170,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   .upbadge{margin-left:4px;font-size:11.5px;padding:2px 9px;border-radius:10px;background:#f1f2f4;color:#8a8f98;border:1px solid #e3e5e8;white-space:nowrap}
   .upbadge.ok{background:#e7f6ec;color:#1a7f37;border-color:#c6e8d2}
   .photonote{font-size:11.5px;color:#1a7f37;margin-left:6px}
+  textarea[data-erp]{min-height:230px;line-height:1.55}
   .trow .u{font-size:11px;color:var(--muted)}
   .tsum{margin-top:8px;font-size:12px;color:var(--muted)}
   .tsum b{color:var(--ink);font-family:var(--mono)}
@@ -259,7 +260,7 @@ function blankRecord(){
     id:++uid,
     sel:{type:'U',mode:'',conn:'',spec:'',mic:'',equip:'',head:'',req:'',prod:'',ver:'1'},
     erpEdited:false, erp:'',
-    order:'', lab:'', eng:'', brand:'', proj:'', dut:'', serial:'', storage:'', cnt:'1',
+    order:'', lab:'', eng:'', brand:'', proj:'', dut:'', serial:'', storage:'',
     photo:'', photoName:'', photoUrl:'',
     times: TIME_LABELS.map(()=>({start:'',end:'',hr:'',hrEdited:false})),
     line:{ report:'', dutSrc:'客戶自帶', dutNo:'', billing:'auto', onsite:'', charge:'知道', review:'', status:'新增' },
@@ -532,8 +533,7 @@ function renderRecord(rec, idx){
             <div class="fld"><label>品牌</label><input data-rid="${rec.id}" data-f="brand" value="${esc(rec.brand)}"></div>
             <div class="fld"><label>訂單流水號 <span class="opt">(*選填)</span></label><input data-rid="${rec.id}" data-f="serial" value="${esc(rec.serial)}"></div>
             <div class="fld full"><label>專案名稱</label><input data-rid="${rec.id}" data-f="proj" value="${esc(rec.proj)}"></div>
-            <div class="fld"><label>樣品儲存 <span class="opt">(*選填)</span></label><input data-rid="${rec.id}" data-f="storage" value="${esc(rec.storage)}" placeholder="A7"></div>
-            <div class="fld"><label>測試筆數</label><input data-rid="${rec.id}" data-f="cnt" value="${esc(rec.cnt)}" inputmode="numeric"></div>
+
             <div class="fld full"><label>架設圖 <span class="opt">(*選填，上傳到模板試算表用)</span></label>
               <input type="file" accept="image/*" data-rid="${rec.id}" data-photo="1">
               <span class="photonote">${rec.photoName?'已選擇：'+esc(rec.photoName):''}</span>
@@ -566,6 +566,7 @@ function lineSection(rec){
         </div>
       </div>
       <div class="fld"><label>DUT 編號${L.dutSrc==='貝爾倉庫'?'':' <span class="lnote-hint">客戶自帶時不顯示</span>'}</label><input data-rid="${rec.id}" data-l="dutNo" value="${esc(L.dutNo)}" placeholder="2026-0348-2" ${L.dutSrc==='貝爾倉庫'?'':'disabled'}></div>
+      <div class="fld"><label>樣品儲存 <span class="opt">(*選填)</span></label><input data-rid="${rec.id}" data-f="storage" value="${esc(rec.storage)}" placeholder="A7"></div>
       <div class="fld"><label>計費</label><select data-rid="${rec.id}" data-l="billing">${billOpts}</select></div>
       <div class="fld"><label>產品號狀態</label>
         <div class="seg-toggle" data-rid="${rec.id}" data-l="status">
@@ -838,7 +839,7 @@ function tplPayload(rec){
     '陪測':rec.line.onsite, '計費':billingOf(rec), '收費':rec.line.charge,
     '品牌':rec.brand, '連絡人':g('h_contact'), '樣品號ID':rec.line.dutNo,
     '樣品儲存':rec.storage, 'LabNo.':rec.lab, '測試工程師':rec.eng,
-    'DUT數量':rec.dut, '測試筆數':rec.cnt,
+    'DUT數量':rec.dut,
     'Type':segDesc(rec,SEGS[0]), 'Mode':segDesc(rec,SEGS[1]), '連線方式':segDesc(rec,SEGS[2]),
     'SPEC版本':segDesc(rec,SEGS[3]), '麥克風':segDesc(rec,SEGS[4]), '測試設備':segDesc(rec,SEGS[5]),
     '人頭/人工嘴/喇叭':segDesc(rec,SEGS[6]), '測試需求':segDesc(rec,SEGS[7]), '產品別':segDesc(rec,SEGS[9]),
@@ -919,7 +920,7 @@ function normalizeRecord(r){
   if(r.id) b.id=r.id;
   Object.assign(b.sel, r.sel||{});
   b.erpEdited=!!r.erpEdited; b.erp=r.erp||'';
-  ['order','lab','eng','brand','proj','dut','serial','storage','cnt','photoName','photoUrl'].forEach(k=>{ if(r[k]!=null) b[k]=r[k]; });
+  ['order','lab','eng','brand','proj','dut','serial','storage','photoName','photoUrl'].forEach(k=>{ if(r[k]!=null) b[k]=r[k]; });
   if(Array.isArray(r.times)) b.times=b.times.map((t,i)=>{ const s=r.times[i]; return s?{start:s.start||'',end:s.end||'',hr:s.hr||'',hrEdited:!!s.hrEdited}:t; });
   Object.assign(b.line, r.line||{});
   if(r.uploaded) b.uploaded=r.uploaded;
