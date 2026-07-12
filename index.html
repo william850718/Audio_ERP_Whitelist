@@ -260,6 +260,7 @@ function blankRecord(){
     id:++uid,
     sel:{type:'U',mode:'',conn:'',spec:'',mic:'',equip:'',head:'',req:'',prod:'',ver:'1'},
     erpEdited:false, erp:'',
+    order:'', orderEdited:false, uid:'',
     lab:'', eng:'', brand:'', proj:'', dut:'', serial:'', storage:'',
     photo:'', photoName:'', photoUrl:'',
     times: TIME_LABELS.map(()=>({start:'',end:'',hr:'',hrEdited:false})),
@@ -500,6 +501,7 @@ function renderRecord(rec, idx){
       <span class="ttl">記錄 ${idx+1}</span>
       ${rec.uploaded?`<span class="upbadge ok">已上傳 ${rec.uploaded}</span>`:`<span class="upbadge">未上傳</span>`}
       <button class="dlbtn" data-dl="${rec.id}" data-idx="${idx}">下載此筆白單</button>
+      ${rec.uid?`<button class="rm" data-cdel="${rec.id}">刪除雲端資料</button>`:''}
       <button class="rm" data-rm="${rec.id}">移除</button>
     </div>
     <div class="rec-body">
@@ -528,6 +530,7 @@ function renderRecord(rec, idx){
         <div>
           <p class="sect-t">訂單與測試資訊</p>
           <div class="inforows">
+            <div class="fld full"><label>訂單單號 Order No.（自動帶入報告號，可修改）</label><input data-rid="${rec.id}" data-f="order" value="${esc(rec.order)}" placeholder="貼上報告號後自動帶入"></div>
             <div class="fld"><label>Lab No.</label><input data-rid="${rec.id}" data-f="lab" value="${esc(rec.lab)}" placeholder="A7"></div>
             <div class="fld"><label>DUT 數量</label><input data-rid="${rec.id}" data-f="dut" value="${esc(rec.dut)}" inputmode="numeric"></div>
             <div class="fld full"><label>測試工程師</label><input data-rid="${rec.id}" data-f="eng" value="${esc(rec.eng)}"></div>
@@ -634,7 +637,9 @@ function bind(){
     el.onchange=()=>{ const r=getRec(el.dataset.rid); r.sel[el.dataset.seg]=el.value; r.erpEdited=false; markDirty(r); render(); };
   });
   document.querySelectorAll('input[data-f]').forEach(el=>{
-    el.oninput=()=>{ const r=getRec(el.dataset.rid); r[el.dataset.f]=el.value; markDirty(r); updateLinePreview(r); };
+    el.oninput=()=>{ const r=getRec(el.dataset.rid); r[el.dataset.f]=el.value;
+      if(el.dataset.f==='order'){ r.orderEdited = el.value.trim()!==''; if(!r.orderEdited){ r.order=orderNoOf(r); el.value=r.order; } }
+      markDirty(r); updateLinePreview(r); };
   });
   document.querySelectorAll('textarea[data-erp]').forEach(el=>{
     el.oninput=()=>{ const r=getRec(el.dataset.rid); r.erpEdited=true; r.erp=el.value; };
@@ -675,7 +680,9 @@ function bind(){
   document.querySelectorAll('[data-l]').forEach(el=>{
     if(el.classList.contains('seg-toggle')) return;
     const rid=el.dataset.rid, key=el.dataset.l;
-    const h=()=>{ const r=getRec(rid); r.line[key]=el.value; markDirty(r); updateLinePreview(r); };
+    const h=()=>{ const r=getRec(rid); r.line[key]=el.value;
+      if(key==='report' && !r.orderEdited){ r.order=orderNoOf(r); const oi=document.querySelector(`input[data-f="order"][data-rid="${r.id}"]`); if(oi) oi.value=r.order; }
+      markDirty(r); updateLinePreview(r); };
     el.oninput=h; el.onchange=h;
   });
   // LINE 切換鈕（DUT來源、產品號狀態）
@@ -690,6 +697,20 @@ function bind(){
       compressImage(f,(durl)=>{ r.photo=durl; r.photoUrl=''; r.photoName=f.name; markDirty(r);
         const note=el.parentElement.querySelector('.photonote'); if(note) note.textContent='已選擇：'+f.name;
       });
+    };
+  });
+  document.querySelectorAll('[data-cdel]').forEach(el=>{
+    el.onclick=async()=>{ const r=getRec(el.dataset.cdel); if(!r||!r.uid) return;
+      if(!confirm('確定要刪除「雲端試算表」上的這筆資料嗎？\n（本機的填寫內容會保留，可修改後重新上傳）')) return;
+      el.disabled=true; el.textContent='刪除中…';
+      const payload=JSON.stringify({secret:GAS_SECRET,action:'delete',uids:[r.uid]});
+      try{
+        let ok=false;
+        try{ const res=await fetch(TPL_URL,{method:'POST',body:payload}); const j=await res.json(); ok=j&&j.ok; }
+        catch(e){ await formPost(TPL_URL,payload); ok=true; }
+        if(ok){ r.uid=''; r.uploaded=''; render(); toast('已刪除雲端資料'); scheduleSave(); }
+        else toast('刪除失敗',true);
+      }finally{ if(document.body.contains(el)){ el.disabled=false; el.textContent='刪除雲端資料'; } }
     };
   });
   document.querySelectorAll('[data-copyline]').forEach(el=>{
@@ -738,7 +759,7 @@ function writeBlock(ws,bs,rec){
     for(let i=0;i<s.w;i++){ const ch=chars[i]; if(ch) setCell(ws, colL(5+col+i)+(bs+1), ch); }
     col+=s.w;
   });
-  setCell(ws,'B'+(bs+2),orderNoOf(rec));
+  setCell(ws,'B'+(bs+2), rec.order||orderNoOf(rec));
   setCell(ws,'E'+(bs+2),rec.lab);
   setCell(ws,'E'+(bs+3),rec.eng);
   setCell(ws,'E'+(bs+4),rec.brand);
@@ -803,11 +824,12 @@ document.getElementById('exportBtn').onclick=doExport;
 const GAS_SECRET='audioWL2026';
 const TPL_URL='https://script.google.com/macros/s/AKfycbz_5mkucKA8FHF3yFLnx-jlvf7Jzd4S-fVbDuZKWom0aOk7ne_m2VRPXlzehI3tjHlf/exec';
 function hrOf(t){ const c=calcHr(t.start,t.end); const v=parseFloat(t.hrEdited?t.hr:c.hr); return isNaN(v)?0:v; }
+function genUid(){ return (typeof crypto!=='undefined'&&crypto.randomUUID)?crypto.randomUUID():('u'+Date.now()+Math.random().toString(16).slice(2)); }
 async function doUpload(){
   const btn=document.getElementById('uploadBtn');
   if(!TPL_URL){ toast('尚未設定模板試算表網址',true); return; }
   const incomplete=records.filter(r=>!isComplete(r)).length;
-  let msg=`確定要上傳 ${records.length} 筆記錄到白單系統嗎？\n（目前重複上傳會產生重複列）`;
+  let msg=`確定要上傳 ${records.length} 筆記錄到白單系統嗎？\n（已上傳過的記錄會更新原資料，不會重複）`;
   if(incomplete) msg+=`\n注意：有 ${incomplete} 筆產品編號尚未選完。`;
   if(!confirm(msg)) return;
   const prev=btn.textContent; btn.disabled=true; btn.textContent='上傳中…';
@@ -817,7 +839,7 @@ async function doUpload(){
       const t=new Date(), hh=`${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
       records.forEach(r=>r.uploaded=hh);
       render();
-      toast(tj.fallback ? '已送出，請開試算表確認' : `上傳成功（${tj.added||0} 筆）`);
+      toast(tj.fallback ? '已送出，請開試算表確認' : `上傳成功（新增 ${tj.added||0} 筆、更新 ${tj.updated||0} 筆）`);
     } else toast('上傳失敗：'+((tj&&tj.error)||'未知錯誤'),true);
   }catch(err){ toast('上傳失敗：'+err.message,true); }
   btn.disabled=false; btn.textContent=prev;
@@ -835,7 +857,7 @@ function tplPayload(rec){
   const p={
     '測試日期':g('h_date').replace(/-/g,'/'), '預約編號':g('h_book'), '訂單流水號':rec.serial,
     '完整訂單單號':rec.line.report,
-    '訂單單號OrderNo.':orderNoOf(rec),
+    '訂單單號OrderNo.':rec.order||orderNoOf(rec),
     '專案名稱':rec.proj, '客戶':sharedCustText.trim(), 'DUT':dutLine(rec),
     '陪測':rec.line.onsite, '計費':billingOf(rec), '收費':rec.line.charge,
     '品牌':rec.brand, '連絡人':g('h_contact'), '樣品號ID':rec.line.dutNo,
@@ -848,6 +870,7 @@ function tplPayload(rec){
     'ERP生成文字':genLine(rec), '產品編號':fullCode(rec),
     '產品編號_拆解':SEGS.map(s=>segVal(rec,s)||'').join('_'),
     '樣品圖片':rec.photoUrl||'', '上傳日期':new Date().toISOString().slice(0,10).replace(/-/g,'/'),
+    '上傳識別碼':rec.uid,
     photoData:(rec.photo&&!rec.photoUrl)?rec.photo:'', photoName:rec.photoName||''
   };
   TIME_LABELS.forEach((lb,i)=>{ const t=rec.times[i];
@@ -880,6 +903,7 @@ function jsonp(url){
   });
 }
 async function uploadTemplate(){
+  records.forEach(r=>{ if(!r.uid) r.uid=genUid(); });
   const payload=JSON.stringify({secret:GAS_SECRET,action:'rows',rows:records.map(tplPayload)});
   // 標準通道：最多試 2 次
   for(let i=0;i<2;i++){
@@ -921,7 +945,8 @@ function normalizeRecord(r){
   if(r.id) b.id=r.id;
   Object.assign(b.sel, r.sel||{});
   b.erpEdited=!!r.erpEdited; b.erp=r.erp||'';
-  ['lab','eng','brand','proj','dut','serial','storage','photoName','photoUrl'].forEach(k=>{ if(r[k]!=null) b[k]=r[k]; });
+  ['order','lab','eng','brand','proj','dut','serial','storage','photoName','photoUrl','uid'].forEach(k=>{ if(r[k]!=null) b[k]=r[k]; });
+  b.orderEdited=!!r.orderEdited;
   if(Array.isArray(r.times)) b.times=b.times.map((t,i)=>{ const s=r.times[i]; return s?{start:s.start||'',end:s.end||'',hr:s.hr||'',hrEdited:!!s.hrEdited}:t; });
   Object.assign(b.line, r.line||{});
   if(r.uploaded) b.uploaded=r.uploaded;
