@@ -851,6 +851,19 @@ async function doUpload(){
   let msg=`確定要上傳 ${records.length} 筆記錄到白單系統嗎？\n（已上傳過的記錄會更新原資料，不會重複）`;
   if(incomplete) msg+=`\n注意：有 ${incomplete} 筆產品編號尚未選完。`;
   if(!confirm(msg)) return;
+  // 防呆：上傳過的記錄若「測試日期/預約編號」變了，很可能是另一筆新測試
+  {
+    const hist=loadHist();
+    const g=id=>((document.getElementById(id)||{}).value||'').trim();
+    records.forEach(r=>{
+      if(!r.uid) return;
+      const h=hist.find(x=>x.uid===r.uid); if(!h) return;
+      if(h.date!==g('h_date') || h.book!==g('h_book')){
+        const asNew=confirm(`此筆（${fullCode(r)}）之前上傳過：\n上次：${h.date}／${h.book}\n這次：${g('h_date')}／${g('h_book')}\n\n測試日期或預約編號變了——這是「另一筆新測試」嗎？\n\n【確定】＝當成新紀錄上傳（雲端原紀錄保留）\n【取消】＝我在修正原紀錄（更新雲端原列）`);
+        if(asNew){ r.uid=genUid(); r.uploaded=''; }
+      }
+    });
+  }
   const prev=btn.textContent; btn.disabled=true; btn.textContent='上傳中…';
   try{
     const tj=await uploadTemplate();
