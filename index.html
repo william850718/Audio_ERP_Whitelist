@@ -856,8 +856,8 @@ function genUid(){ return (typeof crypto!=='undefined'&&crypto.randomUUID)?crypt
 async function doUpload(){
   const btn=document.getElementById('uploadBtn');
   if(!TPL_URL){ toast('尚未設定模板試算表網址',true); return; }
-  const incomplete=records.filter(r=>!isComplete(r)).length;
-  if(incomplete && !confirm(`有 ${incomplete} 筆的產品編號尚未選完，仍要上傳嗎？`)) return;
+  const incompleteIdx=records.map((r,i)=>!isComplete(r)?(i+1):0).filter(Boolean);
+  if(incompleteIdx.length){ toast(`記錄 ${incompleteIdx.join('、')} 的產品編號尚未選完，請完成後再上傳`,true); return; }
   // 防呆：上傳過的記錄身分變更判定
   //   只有 20 碼變（同日同預約號）→ 明顯是另一筆測試（如不同連線模式）→ 自動視為新紀錄
   //   日期或預約號變了 → 詢問是新測試還是修正
