@@ -500,6 +500,7 @@ function renderRecord(rec, idx){
       <span class="rec-no">${idx+1}</span>
       <span class="ttl">記錄 ${idx+1}</span>
       ${rec.uploaded?`<span class="upbadge ok">已上傳 ${rec.uploaded}</span>`:`<span class="upbadge">未上傳</span>`}
+      <button class="dlbtn" data-dup="${rec.id}">複製此筆</button>
       <button class="dlbtn" data-dl="${rec.id}" data-idx="${idx}">下載此筆白單</button>
       ${rec.uid?`<button class="rm" data-cdel="${rec.id}">刪除雲端資料</button>`:''}
       <button class="rm" data-rm="${rec.id}">移除</button>
@@ -697,6 +698,17 @@ function bind(){
       compressImage(f,(durl)=>{ r.photo=durl; r.photoUrl=''; r.photoName=f.name; markDirty(r);
         const note=el.parentElement.querySelector('.photonote'); if(note) note.textContent='已選擇：'+f.name;
       });
+    };
+  });
+  document.querySelectorAll('[data-dup]').forEach(el=>{
+    el.onclick=()=>{
+      if(records.length>=3){ toast('最多只能 3 筆，請先移除一筆',true); return; }
+      const r=getRec(el.dataset.dup); if(!r) return;
+      const c=JSON.parse(JSON.stringify(r));
+      c.id=++uid; c.uid=''; c.uploaded='';   // 新卡片：識別碼歸零，上傳時視為全新資料
+      const i=records.findIndex(x=>x.id===r.id);
+      records.splice(i+1,0,c); render();
+      toast('已複製為新的一筆（修改日期/預約編號後再上傳）');
     };
   });
   document.querySelectorAll('[data-cdel]').forEach(el=>{
