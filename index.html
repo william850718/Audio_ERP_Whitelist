@@ -183,6 +183,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   .hist-row .hbtn:hover{border-color:var(--accent);color:var(--accent)}
   .hist-row .hbtn.danger:hover{border-color:var(--warn);color:var(--warn)}
   .hist-empty{color:var(--muted);padding:24px;text-align:center}
+  .hdrgrid{display:grid;grid-template-columns:150px 150px 1fr 160px;gap:10px;margin-bottom:14px;padding:12px;background:#f6f9fc;border:1px solid var(--line2);border-radius:10px}
+  @media (max-width:900px){ .hdrgrid{grid-template-columns:1fr 1fr} }
   .trow .u{font-size:11px;color:var(--muted)}
   .tsum{margin-top:8px;font-size:12px;color:var(--muted)}
   .tsum b{color:var(--ink);font-family:var(--mono)}
@@ -213,13 +215,6 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     <button class="btn" id="histBtn" style="margin-left:auto">歷史紀錄</button>
   </div>
 
-  <!-- shared header -->
-  <div class="panel shared">
-    <div class="fld"><label>測試日期</label><input id="h_date" type="date"></div>
-    <div class="fld"><label>預約編號</label><input id="h_book" placeholder="TU260000"></div>
-    <div class="fld"><label>客戶（整張單共用，自動帶入編號 14–17 位）</label><input id="h_cust" placeholder="e.g. Barco(L5444)" autocomplete="off"></div>
-    <div class="fld"><label>連絡人</label><input id="h_contact"></div>
-  </div>
 
   <div id="records"></div>
 </div>
@@ -265,19 +260,21 @@ const TIME_LABELS = ['A架設時間','B測試時間','C收拾時間','D報告時
 
 let records = [];
 let uid = 0;
-let sharedCust = '';       // 從客戶欄位抓出的 4 碼編號（帶入產品編號 14–17 位）
-let sharedCustText = '';   // 客戶欄位的原始輸入文字（寫入白單表頭）
 function extractCust(text){ const m=String(text||'').match(/(\d{4})/); return m?m[1]:''; }
 function custNameFromText(t){
   if(!t) return '';
   return String(t).replace(/[\(（][^)）]*[\)）]\s*$/,'').replace(/\b[A-Za-z]?\d{4}\b/,'').trim();
 }
-let sharedCustName='';   // 客戶名稱（直接從輸入文字取，不查清單）
-function segVal(rec, s){ return s.key==='cust' ? sharedCust : (rec.sel[s.key]||''); }
+/* 每筆記錄自帶表頭（測試日期/預約編號/客戶/連絡人） */
+function hdrOf(rec){ return rec.hdr||(rec.hdr={date:'',book:'',cust:'',contact:''}); }
+function custNumOf(rec){ return extractCust(hdrOf(rec).cust); }
+function custNameOf(rec){ return custNameFromText(hdrOf(rec).cust); }
+function segVal(rec, s){ return s.key==='cust' ? custNumOf(rec) : (rec.sel[s.key]||''); }
 
 function blankRecord(){
   return {
     id:++uid,
+    hdr:{date:new Date().toISOString().slice(0,10), book:'', cust:'', contact:''},
     sel:{type:'U',mode:'',conn:'',spec:'',mic:'',equip:'',head:'',req:'',prod:'',ver:'1'},
     erpEdited:false, erp:'',
     order:'', orderEdited:false, uid:'',
@@ -291,9 +288,9 @@ function blankRecord(){
 /* ---------- LINE 訊息 ---------- */
 const WD=['日','一','二','三','四','五','六'];
 function weekdayOf(dateStr){ if(!dateStr) return ''; const d=new Date(dateStr+'T00:00'); return isNaN(d)?'':WD[d.getDay()]; }
-function deliverNote(){
+function deliverNote(rec){
   // 測試日期 → 今天（發訊息當天）相差天數
-  const td=(document.getElementById('h_date')||{}).value||'';
+  const td=hdrOf(rec).date||'';
   if(!td) return '當日傳';
   const t=new Date(td+'T00:00'); if(isNaN(t)) return '當日傳';
   const now=new Date(); now.setHours(0,0,0,0);
@@ -314,19 +311,19 @@ function dutLine(rec){ return rec.line.dutSrc==='貝爾倉庫' ? rec.line.dutNo 
 /* 訂單單號 Order No.：從報告號自動解析（取開頭 XXX_XX_XXXX 段） */
 function orderNoOf(rec){ const m=String(rec.line.report||'').trim().match(/^[A-Za-z0-9]+_[0-9]+_[0-9]+/); return m?m[0]:''; }
 function genLine(rec){
-  const dateStr=(document.getElementById('h_date')||{}).value||'';
+  const dateStr=hdrOf(rec).date||'';
   let dd=''; if(dateStr){ const p=dateStr.split('-'); dd=`${p[1]}/${p[2]}`; }
   const wd=weekdayOf(dateStr); const wdTxt=wd?` (${wd})`:'';
-  const booking=((document.getElementById('h_book')||{}).value||'').trim();
+  const booking=(hdrOf(rec).book||'').trim();
   const L=rec.line; const tt=testTimeLine(rec);
   const out=[];
-  out.push(`${rec.eng||''} ${dd}${wdTxt} ${deliverNote()}`.replace(/\s+/g,' ').trim());
+  out.push(`${rec.eng||''} ${dd}${wdTxt} ${deliverNote(rec)}`.replace(/\s+/g,' ').trim());
   out.push(`預約號: ${booking}`);
   out.push(`測試時間: ${tt}`);
   out.push(`報告號: `);
   if(L.report) out.push(L.report);
   out.push(`產品號: ${fullCode(rec)} (${L.status})`);
-  out.push(`客戶: ${sharedCustName}`);
+  out.push(`客戶: ${custNameOf(rec)}`);
   out.push(`DUT: ${dutLine(rec)}`);
   out.push(`現場陪測:${L.onsite}`);
   out.push(`計費: ${billingOf(rec)}`);
@@ -357,7 +354,7 @@ function genErp(rec){
     const v = segVal(rec,s);
     if(!v) return null;
     if(s.key==='ver') return `${v} : version`;
-    if(s.key==='cust') return sharedCustName ? `${v} : ${sharedCustName}` : `${v}`;
+    if(s.key==='cust') return custNameOf(rec) ? `${v} : ${custNameOf(rec)}` : `${v}`;
     return `${v} : ${descFor(s.data,v)}`;
   }).filter(Boolean);
   return parts.join('\n');
@@ -487,9 +484,10 @@ function renderRecord(rec, idx){
     }
     if(s.key==='cust'){
       let txt, muted=false;
-      if(sharedCust){
-        txt = sharedCustName ? `${sharedCust} — ${sharedCustName}` : `${sharedCust}`;
-      } else { txt='↑ 在上方「客戶」填入含 4 碼編號的客戶'; muted=true; }
+      const cn=custNumOf(rec);
+      if(cn){
+        txt = custNameOf(rec) ? `${cn} — ${custNameOf(rec)}` : `${cn}`;
+      } else { txt='← 在「客戶」欄填入含 4 碼編號的客戶'; muted=true; }
       return `<div class="fld">
         <label><span class="pos">${posTag(s)}</span> ${s.label}</label>
         <div class="cust-ro ${muted?'muted':''}">${txt}</div>
@@ -525,6 +523,12 @@ function renderRecord(rec, idx){
       <button class="rm" data-rm="${rec.id}">移除</button>
     </div>
     <div class="rec-body">
+      <div class="hdrgrid">
+        <div class="fld"><label>測試日期</label><input type="date" data-rid="${rec.id}" data-h="date" value="${esc(hdrOf(rec).date)}"></div>
+        <div class="fld"><label>預約編號</label><input data-rid="${rec.id}" data-h="book" value="${esc(hdrOf(rec).book)}" placeholder="TU260000"></div>
+        <div class="fld"><label>客戶（自動帶入編號 14–17 位）</label><input data-rid="${rec.id}" data-h="cust" value="${esc(hdrOf(rec).cust)}" placeholder="e.g. Barco(L5444)" autocomplete="off"></div>
+        <div class="fld"><label>連絡人</label><input data-rid="${rec.id}" data-h="contact" value="${esc(hdrOf(rec).contact)}"></div>
+      </div>
       <div class="grid2">
         <div>
           <p class="sect-t">產品編號 — 依編碼原則選擇</p>
@@ -653,6 +657,10 @@ function markDirty(r){
   if(b){ b.className='upbadge'; b.textContent='未上傳'; }
 }
 function bind(){
+  document.querySelectorAll('input[data-h]').forEach(el=>{
+    el.oninput=()=>{ const r=getRec(el.dataset.rid); if(!r) return; hdrOf(r)[el.dataset.h]=el.value; markDirty(r); updateLinePreview(r); };
+    el.onchange=()=>{ const r=getRec(el.dataset.rid); if(!r) return; hdrOf(r)[el.dataset.h]=el.value; if(el.dataset.h==='cust'||el.dataset.h==='date') render(); };
+  });
   document.querySelectorAll('select[data-seg]').forEach(el=>{
     el.onchange=()=>{ const r=getRec(el.dataset.rid); r.sel[el.dataset.seg]=el.value; r.erpEdited=false; markDirty(r); render(); };
   });
@@ -801,12 +809,13 @@ async function buildAndDownload(recsToWrite, fnSuffix, silent){
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(b64ToU8(TPL_B64).buffer);
     const ws = wb.getWorksheet('Audio');
-    const d=document.getElementById('h_date').value;
+    const hd=hdrOf(recsToWrite[0]||{});
+    const d=hd.date||'';
     if(d){ const [,m,dd]=d.split('-'); setCell(ws,'B1',`測試日期: ${m}/${dd}`); }
-    const bk=document.getElementById('h_book').value.trim();
-    const ct=document.getElementById('h_contact').value.trim();
+    const bk=(hd.book||'').trim();
+    const ct=(hd.contact||'').trim();
     if(bk) setCell(ws,'E1',`預約編號: ${bk}`);
-    if(sharedCustText.trim()) setCell(ws,'J1',`客戶: ${sharedCustText.trim()}`);
+    if((hd.cust||'').trim()) setCell(ws,'J1',`客戶: ${hd.cust.trim()}`);
     if(ct) setCell(ws,'O1',`連絡人: ${ct}`);
     recsToWrite.forEach((r,i)=>{ if(i<3) writeBlock(ws,BLOCKS[i],r); });
     const buf = await wb.xlsx.writeBuffer();
@@ -848,19 +857,16 @@ async function doUpload(){
   const btn=document.getElementById('uploadBtn');
   if(!TPL_URL){ toast('尚未設定模板試算表網址',true); return; }
   const incomplete=records.filter(r=>!isComplete(r)).length;
-  let msg=`確定要上傳 ${records.length} 筆記錄到白單系統嗎？\n（已上傳過的記錄會更新原資料，不會重複）`;
-  if(incomplete) msg+=`\n注意：有 ${incomplete} 筆產品編號尚未選完。`;
-  if(!confirm(msg)) return;
-  // 防呆：上傳過的記錄若「測試日期/預約編號」變了，很可能是另一筆新測試
+  if(incomplete && !confirm(`有 ${incomplete} 筆的產品編號尚未選完，仍要上傳嗎？`)) return;
+  // 防呆：上傳過的記錄若「測試日期/預約編號/20碼」變了，可能是另一筆新測試
   {
     const hist=loadHist();
-    const g=id=>((document.getElementById(id)||{}).value||'').trim();
     records.forEach(r=>{
       if(!r.uid) return;
       const h=hist.find(x=>x.uid===r.uid); if(!h) return;
-      const codeNow=fullCode(r);
-      if(h.date!==g('h_date') || h.book!==g('h_book') || h.code!==codeNow){
-        const asNew=confirm(`此筆之前上傳過：\n上次：${h.date}／${h.book}\n　　　${h.code}\n這次：${g('h_date')}／${g('h_book')}\n　　　${codeNow}\n\n測試日期／預約編號／產品編號變了——這是「另一筆新測試」嗎？\n\n【確定】＝當成新紀錄上傳（雲端原紀錄保留）\n【取消】＝我在修正原紀錄（更新雲端原列）`);
+      const codeNow=fullCode(r), hd=hdrOf(r);
+      if(h.date!==(hd.date||'') || h.book!==(hd.book||'').trim() || h.code!==codeNow){
+        const asNew=confirm(`此筆之前上傳過：\n上次：${h.date}／${h.book}\n　　　${h.code}\n這次：${hd.date}／${(hd.book||'').trim()}\n　　　${codeNow}\n\n測試日期／預約編號／產品編號變了——這是「另一筆新測試」嗎？\n\n【確定】＝當成新紀錄上傳（雲端原紀錄保留）\n【取消】＝我在修正原紀錄（更新雲端原列）`);
         if(asNew){ r.uid=genUid(); r.uploaded=''; }
       }
     });
@@ -881,20 +887,19 @@ async function doUpload(){
 function segDesc(rec,s){
   const v=segVal(rec,s); if(!v) return '';
   if(s.key==='ver') return v;
-  if(s.key==='cust') return sharedCustName||v;
+  if(s.key==='cust') return custNameOf(rec)||v;
   const list=CODING[s.data]||[]; const hit=list.find(x=>String(x.code)===String(v));
   return hit?hit.desc:v;
 }
 function tplPayload(rec){
-  const g=id=>((document.getElementById(id)||{}).value||'').trim();
   const spans=rec.times.map(hrOf);
   const p={
-    '測試日期':g('h_date').replace(/-/g,'/'), '預約編號':g('h_book'), '訂單流水號':rec.serial,
+    '測試日期':(hdrOf(rec).date||'').replace(/-/g,'/'), '預約編號':(hdrOf(rec).book||'').trim(), '訂單流水號':rec.serial,
     '完整訂單單號':rec.line.report,
     '訂單單號OrderNo.':rec.order||orderNoOf(rec),
-    '專案名稱':rec.proj, '客戶':sharedCustText.trim(), 'DUT':dutLine(rec),
+    '專案名稱':rec.proj, '客戶':(hdrOf(rec).cust||'').trim(), 'DUT':dutLine(rec),
     '陪測':rec.line.onsite, '計費':billingOf(rec), '收費':rec.line.charge,
-    '品牌':rec.brand, '連絡人':g('h_contact'), '樣品號ID':rec.line.dutNo,
+    '品牌':rec.brand, '連絡人':(hdrOf(rec).contact||'').trim(), '樣品號ID':rec.line.dutNo,
     '樣品儲存':rec.storage, 'LabNo.':rec.lab, '測試工程師':rec.eng,
     'DUT數量':rec.dut,
     'Type':segDesc(rec,SEGS[0]), 'Mode':segDesc(rec,SEGS[1]), '連線方式':segDesc(rec,SEGS[2]),
@@ -964,14 +969,13 @@ const HIST_KEY='audioWhitelist:hist';
 function loadHist(){ try{ return JSON.parse(localStorage.getItem(HIST_KEY)||'[]'); }catch(e){ return []; } }
 function saveHist(l){ try{ localStorage.setItem(HIST_KEY, JSON.stringify(l.slice(0,100))); }catch(e){} }
 function archiveRecords(hh){
-  const g=id=>(document.getElementById(id)||{}).value||'';
   let hist=loadHist();
   records.forEach(r=>{
     if(!r.uid) return;
     const snap=JSON.parse(JSON.stringify(r)); snap.photo='';
-    const entry={uid:r.uid, at:Date.now(), date:g('h_date'), book:g('h_book'),
-      code:fullCode(r), eng:r.eng, upAt:hh,
-      header:{date:g('h_date'),book:g('h_book'),cust:g('h_cust'),contact:g('h_contact')}, rec:snap};
+    const hd=hdrOf(r);
+    const entry={uid:r.uid, at:Date.now(), date:hd.date||'', book:(hd.book||'').trim(),
+      code:fullCode(r), eng:r.eng, upAt:hh, rec:snap};
     const i=hist.findIndex(x=>x.uid===r.uid);
     if(i>=0) hist[i]=entry; else hist.unshift(entry);
   });
@@ -1010,10 +1014,6 @@ function histLoad(i){
     return;
   }
   if(records.length>=3){ toast('目前已有 3 筆，請先移除一筆再載入',true); return; }
-  if(!confirm('載入會套用該筆的表頭（測試日期/預約編號/客戶/連絡人），繼續？')) return;
-  const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=v||''; };
-  set('h_date',h.header.date); set('h_book',h.header.book); set('h_cust',h.header.cust); set('h_contact',h.header.contact);
-  sharedCustText=h.header.cust||''; sharedCust=extractCust(sharedCustText); sharedCustName=custNameFromText(sharedCustText);
   const rec=normalizeRecord(h.rec); rec.id=++uid; rec.uid=h.uid; rec.uploaded=h.upAt||'已上傳';
   records.push(rec); render();
   const card=document.querySelector(`.rec[data-rid="${rec.id}"]`);
@@ -1036,13 +1036,12 @@ document.getElementById('histClose').onclick=()=>document.getElementById('histOv
 document.getElementById('histOverlay').onclick=(e)=>{ if(e.target.id==='histOverlay') e.target.classList.add('hidden'); };
 
 /* ---------- 本機自動暫存（localStorage：只存在使用者自己的瀏覽器，不會上傳或互通）---------- */
-const LS_KEY='audioWhitelist:v1';
+const LS_KEY='audioWhitelist:v2';
+const LS_KEY_OLD='audioWhitelist:v1';
 function saveState(){
   try{
-    const g=id=>(document.getElementById(id)||{}).value||'';
     localStorage.setItem(LS_KEY, JSON.stringify({
-      v:1, uid,
-      header:{ date:g('h_date'), book:g('h_book'), cust:g('h_cust'), contact:g('h_contact') },
+      v:2, uid,
       records: records.map(r=>Object.assign({},r,{photo:''}))
     }));
   }catch(e){ /* 無痕模式或空間已滿等情況：忽略，不影響使用 */ }
@@ -1054,6 +1053,7 @@ function normalizeRecord(r){
   if(!r||typeof r!=='object') return b;
   if(r.id) b.id=r.id;
   Object.assign(b.sel, r.sel||{});
+  if(r.hdr) Object.assign(b.hdr, r.hdr);
   b.erpEdited=!!r.erpEdited; b.erp=r.erp||'';
   ['order','lab','eng','brand','proj','dut','serial','storage','photoName','photoUrl','uid'].forEach(k=>{ if(r[k]!=null) b[k]=r[k]; });
   b.orderEdited=!!r.orderEdited;
@@ -1064,10 +1064,18 @@ function normalizeRecord(r){
 }
 function loadState(){
   let data; try{ data=JSON.parse(localStorage.getItem(LS_KEY)||'null'); }catch(e){ data=null; }
+  if(!data){
+    // 舊版暫存升級：把全域表頭塞回每筆記錄
+    try{
+      const old=JSON.parse(localStorage.getItem(LS_KEY_OLD)||'null');
+      if(old && Array.isArray(old.records) && old.records.length){
+        const h=old.header||{};
+        old.records.forEach(r=>{ r.hdr={date:h.date||'',book:h.book||'',cust:h.cust||'',contact:h.contact||''}; });
+        data=old;
+      }
+    }catch(e){}
+  }
   if(!data || !Array.isArray(data.records) || !data.records.length) return false;
-  const h=data.header||{}, set=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=v||''; };
-  set('h_date',h.date); set('h_book',h.book); set('h_cust',h.cust); set('h_contact',h.contact);
-  sharedCustText=h.cust||''; sharedCust=extractCust(h.cust||''); sharedCustName=custNameFromText(h.cust||'');
   records=data.records.slice(0,3).map(normalizeRecord);
   uid=records.reduce((m,r)=>Math.max(m, r.id||0), 0);
   return true;
@@ -1077,11 +1085,6 @@ function loadState(){
 document.addEventListener('click', closeAllPops);
 document.addEventListener('input', scheduleSave, true);   // 補捉表頭與各輸入框的即時輸入
 document.addEventListener('change', scheduleSave, true);
-['h_date','h_book'].forEach(id=>{ const el=document.getElementById(id); if(el) el.oninput=render; });
-(function initCustomer(){
-  const el=document.getElementById('h_cust');
-  el.oninput=()=>{ sharedCustText=el.value; sharedCust=extractCust(el.value); sharedCustName=custNameFromText(el.value); render(); };
-})();
 if(!loadState()){ records.push(blankRecord()); }   // 有暫存就還原，否則開一張空白
 render();
 </script>
