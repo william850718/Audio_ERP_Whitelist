@@ -1031,12 +1031,17 @@ function histLoad(i){
     toast('這筆已在下方卡片中，直接修改後重新上傳即可');
     return;
   }
-  if(records.length>=3){ toast('目前已有 3 筆，請先移除一筆再載入',true); return; }
   const rec=normalizeRecord(h.rec); rec.id=++uid; rec.uid=h.uid; rec.uploaded=h.upAt||'已上傳';
-  records.push(rec); render();
+  const first=records[0];
+  const firstBlank = first && !((first.hdr&&(first.hdr.book||first.hdr.cust)) || first.eng || first.proj || (first.line&&first.line.report) || first.uid);
+  if(first && !firstBlank && !first.uid){
+    if(!confirm('「記錄 1」目前有尚未上傳的內容，載入會將它取代，繼續？')) return;
+  }
+  records[0]=rec;
+  render();
   const card=document.querySelector(`.rec[data-rid="${rec.id}"]`);
   if(card) card.scrollIntoView({behavior:'smooth'});
-  toast('已載入，修改後按「上傳」即可更新原資料');
+  toast('已載入至記錄 1，修改後按「上傳」即可更新原資料');
 }
 async function histDel(i){
   const hist=loadHist(); const h=hist[i]; if(!h) return;
