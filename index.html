@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Audio PAL ERP 編碼原則_Audio Team</title>
+<meta name="theme-color" content="#0b6e6b">
+<meta name="application-name" content="Audio PAL ERP 編碼原則_Audio Team">
+<!-- 安裝為應用程式時，App 名稱以此為準（避免被本機資料夾名覆蓋）；內嵌 data URI 以維持單一檔案 -->
+<link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Audio%20PAL%20ERP%20%E7%B7%A8%E7%A2%BC%E5%8E%9F%E5%89%87_Audio%20Team%22%2C%22short_name%22%3A%22Audio%20PAL%20ERP%22%2C%22start_url%22%3A%22.%2F%22%2C%22scope%22%3A%22.%2F%22%2C%22display%22%3A%22standalone%22%2C%22theme_color%22%3A%22%230b6e6b%22%2C%22background_color%22%3A%22%23eef1f4%22%7D">
 <script>/* ExcelJS (inlined for offline use) */
 /*! ExcelJS 19-10-2023 */
 
@@ -823,7 +827,11 @@ async function buildAndDownload(recsToWrite, fnSuffix, silent){
     let datePart;
     if(d){ datePart = d.replace(/-/g,''); }
     else { const s=new Date(); datePart=`${s.getFullYear()}${pad2(s.getMonth()+1)}${pad2(s.getDate())}`; }
-    const fn=`Audio白單_${datePart}${fnSuffix||''}.xlsx`;
+    // 檔名模式 = 該筆的測試模式描述（例：Teams Audio）；未選模式則退回原本的「第N筆」後綴
+    const modeDesc = descFor('MODE', (recsToWrite[0]&&recsToWrite[0].sel&&recsToWrite[0].sel.mode)||'');
+    const safeMode = modeDesc.replace(/[\\/:*?"<>|]/g,'-').replace(/\s+$/,'');
+    const modePart = safeMode ? `_${safeMode}` : (fnSuffix||'');
+    const fn=`Audio白單_${datePart}${modePart}.xlsx`;
     const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const url=URL.createObjectURL(blob); const a=document.createElement('a');
     a.href=url; a.download=fn; document.body.appendChild(a); a.click(); a.remove();
