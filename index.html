@@ -314,6 +314,9 @@ function testTimeLine(rec){
 function dutLine(rec){ return rec.line.dutSrc==='貝爾倉庫' ? rec.line.dutNo : '客戶自帶'; }
 /* 訂單單號 Order No.：從報告號自動解析（取開頭 XXX_XX_XXXX 段） */
 function orderNoOf(rec){ const m=String(rec.line.report||'').trim().match(/^[A-Za-z0-9]+_[0-9]+_[0-9]+/); return m?m[0]:''; }
+function orderIdOf(rec){ return String((rec.order||orderNoOf(rec))||'').trim(); }  // 重複判斷用：訂單單號（同日同預約號同20碼、但不同報告時用來區分）
+function identityKey(rec){ const hd=hdrOf(rec); return `${hd.date||''}|${(hd.book||'').trim()}|${fullCode(rec)}|${orderIdOf(rec)}`; }  // 一筆記錄的「身分」：日期+預約號+20碼+訂單單號
+function histIdKey(h){ return `${h.date}|${h.book}|${h.code}|${h.order||''}`; }  // 歷史紀錄的同款身分字串
 function genLine(rec){
   const dateStr=hdrOf(rec).date||'';
   let dd=''; if(dateStr){ const p=dateStr.split('-'); dd=`${p[1]}/${p[2]}`; }
@@ -872,20 +875,28 @@ async function doUpload(){
   let autoNew=0;
   {
     const hist=loadHist();
+    // 身分改變時重綁 uid：若新身分「先前上傳過」→ 沿用原 uid（對回原列，例如把訂單單號改回去）；否則給新 uid（新一筆）
+    const rebindUid=(r)=>{
+      const idNow=identityKey(r);
+      const back=hist.find(h=>h.uid!==r.uid && histIdKey(h)===idNow);
+      if(back){ r.uid=back.uid; r.uploaded=''; }        // 改回先前上傳過的身分 → 對回原本那筆，更新原列（不再產生重複）
+      else { r.uid=genUid(); r.uploaded=''; autoNew++; } // 全新身分 → 新一筆
+    };
     records.forEach(r=>{
       if(!r.uid) return;
       const h=hist.find(x=>x.uid===r.uid); if(!h) return;
       const codeNow=fullCode(r), hd=hdrOf(r);
-      const dateChg=h.date!==(hd.date||''), bookChg=h.book!==(hd.book||'').trim(), codeChg=h.code!==codeNow;
+      const dateChg=h.date!==(hd.date||''), bookChg=h.book!==(hd.book||'').trim();
+      const codeChg=h.code!==codeNow, orderChg=(h.order||'')!==orderIdOf(r);
       if(dateChg && bookChg){
-        r.uid=genUid(); r.uploaded=''; autoNew++;   // 日期+預約號都變 → 必為另一場測試
+        rebindUid(r);                                   // 日期+預約號都變 → 必為另一場測試
       } else if(dateChg || bookChg){
         // 只變其中一個 → 可能是修正打錯的欄位，詢問
         const what=dateChg?'測試日期':'預約編號';
         const asNew=confirm(`此筆之前上傳過：\n上次：${h.date}／${h.book}\n這次：${hd.date}／${(hd.book||'').trim()}\n\n只有「${what}」變了——這是「另一筆新測試」嗎？\n\n【確定】＝當成新紀錄上傳（雲端原紀錄保留）\n【取消】＝我在修正原紀錄（更新雲端原列）`);
-        if(asNew){ r.uid=genUid(); r.uploaded=''; }
-      } else if(codeChg){
-        r.uid=genUid(); r.uploaded=''; autoNew++;   // 同日同預約號、20碼不同 → 另一筆測試
+        if(asNew){ rebindUid(r); }
+      } else if(codeChg || orderChg){
+        rebindUid(r);                                   // 同日同預約號、但20碼或訂單單號不同 → 另一筆（改回舊身分則沿用原筆）
       }
     });
   }
@@ -894,8 +905,8 @@ async function doUpload(){
   {
     const hist=loadHist();
     const seen={};
-    records.forEach(r=>{ if(r.uid){ const hd=hdrOf(r); seen[`${hd.date}|${(hd.book||'').trim()}|${fullCode(r)}`]=true; } });
-    hist.forEach(h=>{ seen[`${h.date}|${h.book}|${h.code}`]=true; });
+    records.forEach(r=>{ if(r.uid){ seen[identityKey(r)]=true; } });
+    hist.forEach(h=>{ seen[histIdKey(h)]=true; });
     records.forEach((r,ri)=>{
       r._skip=false;
       if(r.uid){
@@ -903,8 +914,7 @@ async function doUpload(){
         if(r.uploaded){ r._skip=true; unchanged++; dupIdx.push(ri+1); }
         return;
       }
-      const hd=hdrOf(r);
-      const key=`${hd.date}|${(hd.book||'').trim()}|${fullCode(r)}`;
+      const key=identityKey(r);
       if(seen[key]){ r._skip=true; skipped++; dupIdx.push(ri+1); }
       else seen[key]=true;
     });
@@ -1025,7 +1035,7 @@ function archiveRecords(hh){
     const snap=JSON.parse(JSON.stringify(r)); snap.photo='';
     const hd=hdrOf(r);
     const entry={uid:r.uid, at:Date.now(), date:hd.date||'', book:(hd.book||'').trim(),
-      code:fullCode(r), eng:r.eng, upAt:hh, rec:snap};
+      code:fullCode(r), order:orderIdOf(r), eng:r.eng, upAt:hh, rec:snap};
     const i=hist.findIndex(x=>x.uid===r.uid);
     if(i>=0) hist[i]=entry; else hist.unshift(entry);
   });
