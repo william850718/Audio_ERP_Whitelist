@@ -312,8 +312,8 @@ function testTimeLine(rec){
   return `${t.start} - ${t.end} ${hr}hr`;
 }
 function dutLine(rec){ return rec.line.dutSrc==='貝爾倉庫' ? rec.line.dutNo : '客戶自帶'; }
-/* 訂單單號 Order No.：從報告號自動解析（取開頭 XXX_XX_XXXX 段） */
-function orderNoOf(rec){ const m=String(rec.line.report||'').trim().match(/^[A-Za-z0-9]+_[0-9]+_[0-9]+/); return m?m[0]:''; }
+/* 訂單單號 Order No.：從報告號自動解析（取開頭 XXX_XX_XXXX 段，含結尾「-報告序號」如 -1、-2） */
+function orderNoOf(rec){ const m=String(rec.line.report||'').trim().match(/^[A-Za-z0-9]+_[0-9]+_[0-9]+(-[0-9]+)?/); return m?m[0]:''; }
 function orderIdOf(rec){ return String((rec.order||orderNoOf(rec))||'').trim(); }  // 重複判斷用：訂單單號（同日同預約號同20碼、但不同報告時用來區分）
 function identityKey(rec){ const hd=hdrOf(rec); return `${hd.date||''}|${(hd.book||'').trim()}|${fullCode(rec)}|${orderIdOf(rec)}`; }  // 一筆記錄的「身分」：日期+預約號+20碼+訂單單號
 function histIdKey(h){ return `${h.date}|${h.book}|${h.code}|${h.order||''}`; }  // 歷史紀錄的同款身分字串
