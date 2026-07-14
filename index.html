@@ -282,7 +282,7 @@ function blankRecord(){
     sel:{type:'U',mode:'',conn:'',spec:'',mic:'',equip:'',head:'',req:'',prod:'',ver:'1'},
     erpEdited:false, erp:'',
     order:'', orderEdited:false, uid:'',
-    lab:'', eng:'', brand:'', proj:'', dut:'', serial:'', storage:'',
+    lab:'', eng:'', brand:'', proj:'', dut:'', serial:'', storage:'', storageReturned:false,
     photo:'', photoName:'', photoUrl:'',
     times: TIME_LABELS.map(()=>({start:'',end:'',hr:'',hrEdited:false})),
     line:{ report:'', dutSrc:'客戶自帶', dutNo:'', billing:'auto', onsite:'', charge:'知道', review:'', status:'新增' },
@@ -312,6 +312,8 @@ function testTimeLine(rec){
   return `${t.start} - ${t.end} ${hr}hr`;
 }
 function dutLine(rec){ return rec.line.dutSrc==='貝爾倉庫' ? rec.line.dutNo : '客戶自帶'; }
+/* 樣品儲存：選「已歸還樣品管理人員」→ 固定字串；否則用工程師填的實驗室位置 */
+function storageValue(rec){ return rec.storageReturned ? '已歸還樣品管理人員' : (rec.storage||''); }
 /* 訂單單號 Order No.：從報告號自動解析（取開頭 XXX_XX_XXXX 段，含結尾「-報告序號」如 -1、-2） */
 function orderNoOf(rec){ const m=String(rec.line.report||'').trim().match(/^[A-Za-z0-9]+_[0-9]+_[0-9]+(-[0-9]+)?/); return m?m[0]:''; }
 function orderIdOf(rec){ return String((rec.order||orderNoOf(rec))||'').trim(); }  // 重複判斷用：訂單單號（同日同預約號同20碼、但不同報告時用來區分）
@@ -601,7 +603,12 @@ function lineSection(rec){
         </div>
       </div>
       <div class="fld"><label>DUT 編號${L.dutSrc==='貝爾倉庫'?'':' <span class="lnote-hint">客戶自帶時不顯示</span>'}</label><input data-rid="${rec.id}" data-l="dutNo" value="${esc(L.dutNo)}" placeholder="2026-0348-2" ${L.dutSrc==='貝爾倉庫'?'':'disabled'}></div>
-      <div class="fld"><label>樣品儲存 <span class="opt">(*選填)</span></label><input data-rid="${rec.id}" data-f="storage" value="${esc(rec.storage)}" placeholder="A7"></div>
+      <div class="fld"><label>樣品儲存 <span class="opt">(*選填)</span></label>
+        <div class="seg-toggle" data-storet="${rec.id}">
+          <button type="button" class="${rec.storageReturned?'on':''}">已歸還樣品管理人員</button>
+        </div>
+        ${rec.storageReturned?'':`<input data-rid="${rec.id}" data-f="storage" value="${esc(rec.storage)}" placeholder="存放實驗室位置，如 A7">`}
+      </div>
       <div class="fld"><label>計費</label><select data-rid="${rec.id}" data-l="billing">${billOpts}</select></div>
       <div class="fld"><label>產品號狀態</label>
         <div class="seg-toggle" data-rid="${rec.id}" data-l="status">
@@ -725,6 +732,13 @@ function bind(){
     const rid=tg.dataset.rid, key=tg.dataset.l;
     tg.querySelectorAll('button').forEach(b=>{
       b.onclick=()=>{ const r=getRec(rid); r.line[key]=b.dataset.v; markDirty(r); render(); };
+    });
+  });
+  // 樣品儲存切換鈕：已歸還樣品管理人員 <-> 自填實驗室位置
+  document.querySelectorAll('.seg-toggle[data-storet]').forEach(tg=>{
+    const rid=tg.dataset.storet;
+    tg.querySelectorAll('button').forEach(b=>{
+      b.onclick=()=>{ const r=getRec(rid); r.storageReturned=!r.storageReturned; markDirty(r); render(); };
     });
   });
   document.querySelectorAll('input[data-photo]').forEach(el=>{
@@ -959,7 +973,7 @@ function tplPayload(rec){
     '專案名稱':rec.proj, '客戶':(hdrOf(rec).cust||'').trim(), 'DUT':dutLine(rec),
     '陪測':rec.line.onsite, '計費':billingOf(rec), '收費':rec.line.charge,
     '品牌':rec.brand, '連絡人':(hdrOf(rec).contact||'').trim(), '樣品號ID':rec.line.dutNo,
-    '樣品儲存':rec.storage, 'LabNo.':rec.lab, '測試工程師':rec.eng,
+    '樣品儲存':storageValue(rec), 'LabNo.':rec.lab, '測試工程師':rec.eng,
     'DUT數量':rec.dut,
     'Type':segDesc(rec,SEGS[0]), 'Mode':segDesc(rec,SEGS[1]), '連線方式':segDesc(rec,SEGS[2]),
     'SPEC版本':segDesc(rec,SEGS[3]), '麥克風':segDesc(rec,SEGS[4]), '測試設備':segDesc(rec,SEGS[5]),
@@ -1120,7 +1134,7 @@ function normalizeRecord(r){
   Object.assign(b.sel, r.sel||{});
   if(r.hdr) Object.assign(b.hdr, r.hdr);
   b.erpEdited=!!r.erpEdited; b.erp=r.erp||'';
-  ['order','lab','eng','brand','proj','dut','serial','storage','photoName','photoUrl','uid'].forEach(k=>{ if(r[k]!=null) b[k]=r[k]; });
+  ['order','lab','eng','brand','proj','dut','serial','storage','storageReturned','photoName','photoUrl','uid'].forEach(k=>{ if(r[k]!=null) b[k]=r[k]; });
   b.orderEdited=!!r.orderEdited;
   if(Array.isArray(r.times)) b.times=b.times.map((t,i)=>{ const s=r.times[i]; return s?{start:s.start||'',end:s.end||'',hr:s.hr||'',hrEdited:!!s.hrEdited}:t; });
   Object.assign(b.line, r.line||{});
