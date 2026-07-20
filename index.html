@@ -182,8 +182,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   .hist-panel{background:#fff;border-radius:14px;max-width:1080px;width:100%;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25)}
   .hist-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--line2)}
   .hist-list{overflow:auto;padding:8px 18px 16px}
-  .hist-row{display:grid;grid-template-columns:88px 96px 1fr 1fr 172px 90px 156px;gap:10px;align-items:center;padding:9px 6px;border-bottom:1px solid var(--line2);font-size:13px}
+  .hist-row{display:grid;grid-template-columns:88px 96px 64px 1fr 1fr 1.2fr 84px 156px;gap:10px;align-items:center;padding:9px 6px;border-bottom:1px solid var(--line2);font-size:13px}
   .hist-row.hh{color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.4px;padding:6px 6px 4px}
+  .hist-row.hh span{overflow:hidden;white-space:nowrap}
   .hist-row .hcode{font-family:var(--mono);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .hist-row .hcell{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .hist-row .hbtn{border:1px solid var(--line);background:#fff;border-radius:7px;padding:4px 10px;font-size:12px;cursor:pointer;margin-left:6px}
@@ -1053,7 +1054,7 @@ function archiveRecords(hh){
     const hd=hdrOf(r);
     const entry={uid:r.uid, at:Date.now(), date:hd.date||'', book:(hd.book||'').trim(),
       code:fullCode(r), order:orderIdOf(r), eng:r.eng, upAt:hh,
-      cust:custNameOf(r), mode:descFor('MODE', r.sel.mode||''), rec:snap};
+      cust:custNameOf(r), mode:descFor('MODE', r.sel.mode||''), lab:r.lab||'', proj:r.proj||'', rec:snap};
     const i=hist.findIndex(x=>x.uid===r.uid);
     if(i>=0) hist[i]=entry; else hist.unshift(entry);
   });
@@ -1067,17 +1068,20 @@ async function cloudDelete(uidStr){
 }
 function histCust(h){ if(h.cust) return h.cust; const t=h.rec&&h.rec.hdr?h.rec.hdr.cust:''; return custNameFromText(t||''); }   // 舊資料沒存公司名 → 從快照回推
 function histMode(h){ if(h.mode) return h.mode; const mc=h.rec&&h.rec.sel?h.rec.sel.mode:''; return mc?descFor('MODE',mc):''; } // 舊資料沒存 Mode → 從快照回推
+function histLab(h){ return h.lab || (h.rec&&h.rec.lab) || ''; }    // 舊資料沒存實驗室 → 從快照回推
+function histProj(h){ return h.proj || (h.rec&&h.rec.proj) || ''; } // 舊資料沒存專案名稱 → 從快照回推
 function renderHist(){
   const list=document.getElementById('histList');
   const hist=loadHist();
   if(!hist.length){ list.innerHTML='<div class="hist-empty">還沒有上傳過的記錄</div>'; return; }
   list.innerHTML=`<div class="hist-row hh">
-    <span>測試日期</span><span>預約編號</span><span>客戶</span><span>Mode 模式</span><span>產品編號</span><span>工程師</span><span></span>
+    <span>測試日期</span><span>預約編號</span><span>實驗室</span><span>客戶</span><span>Mode 模式</span><span>專案名稱</span><span>工程師</span><span></span>
   </div>`+hist.map((h,i)=>`<div class="hist-row">
     <span>${esc(h.date)}</span><span>${esc(h.book)}</span>
+    <span class="hcell">${esc(histLab(h))}</span>
     <span class="hcell">${esc(histCust(h))}</span>
     <span class="hcell">${esc(histMode(h))}</span>
-    <span class="hcode">${esc(h.code)}</span>
+    <span class="hcell">${esc(histProj(h))}</span>
     <span class="hcell">${esc(h.eng)}</span>
     <span>
       <button class="hbtn" data-hload="${i}">載入修改</button>
