@@ -316,6 +316,7 @@ function testTimeLine(rec){
   return `${t.start} - ${t.end} ${hr}hr`;
 }
 function dutLine(rec){ return rec.line.dutSrc==='貝爾倉庫' ? rec.line.dutNo : '客戶自帶'; }
+function dutNoOf(rec){ return rec.line.dutSrc==='貝爾倉庫' ? (rec.line.dutNo||'') : ''; }  // 客戶自帶時無 DUT 編號（不上傳殘值）
 /* 樣品儲存：選「已歸還樣品管理人員」→ 固定字串；否則用工程師填的實驗室位置 */
 function storageValue(rec){ return rec.storageReturned ? '已歸還樣品管理人員' : (rec.storage||''); }
 /* 訂單單號 Order No.：從報告號自動解析（取開頭 XXX_XX_XXXX 段，含結尾「-報告序號」如 -1、-2） */
@@ -606,7 +607,7 @@ function lineSection(rec){
           <button type="button" class="${L.dutSrc==='貝爾倉庫'?'on':''}" data-v="貝爾倉庫">貝爾倉庫</button>
         </div>
       </div>
-      <div class="fld"><label>DUT 編號${L.dutSrc==='貝爾倉庫'?'':' <span class="lnote-hint">客戶自帶時不顯示</span>'}</label><input data-rid="${rec.id}" data-l="dutNo" value="${esc(L.dutNo)}" placeholder="2026-0348-2" ${L.dutSrc==='貝爾倉庫'?'':'disabled'}></div>
+      <div class="fld"><label>DUT 編號${L.dutSrc==='貝爾倉庫'?'':' <span class="lnote-hint">客戶自帶時不顯示</span>'}</label><input data-rid="${rec.id}" data-l="dutNo" value="${L.dutSrc==='貝爾倉庫'?esc(L.dutNo):''}" placeholder="2026-0348-2" ${L.dutSrc==='貝爾倉庫'?'':'disabled'}></div>
       <div class="fld"><label>樣品儲存 <span class="opt">(*選填)</span></label>
         <div class="seg-toggle" data-storet="${rec.id}">
           <button type="button" class="${rec.storageReturned?'on':''}">已歸還樣品管理人員</button>
@@ -976,7 +977,7 @@ function tplPayload(rec){
     '訂單單號OrderNo.':rec.order||orderNoOf(rec),
     '專案名稱':rec.proj, '客戶':(hdrOf(rec).cust||'').trim(), 'DUT':dutLine(rec),
     '陪測':rec.line.onsite, '計費':billingOf(rec), '收費':rec.line.charge,
-    '品牌':rec.brand, '連絡人':(hdrOf(rec).contact||'').trim(), '樣品號ID':rec.line.dutNo,
+    '品牌':rec.brand, '連絡人':(hdrOf(rec).contact||'').trim(), '樣品號ID':dutNoOf(rec),
     '樣品儲存':storageValue(rec), 'LabNo.':rec.lab, '測試工程師':rec.eng,
     'DUT數量':rec.dut,
     'Type':segDesc(rec,SEGS[0]), 'Mode':segDesc(rec,SEGS[1]), '連線方式':segDesc(rec,SEGS[2]),
